@@ -1,0 +1,8 @@
+# 비밀 정보 (절대 GitHub에 올라가면 안 됨)
+bot/config.yaml
+bot/secrets/
+bot/tmp/
+bot/logs/
+__pycache__/
+*.pyc
+.venv/

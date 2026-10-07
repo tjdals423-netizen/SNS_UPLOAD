@@ -1,0 +1,70 @@
+# 이 파일을 복사해서 config.yaml 로 이름을 바꾼 뒤 값을 채우세요.
+# config.yaml 은 GitHub 에 올라가지 않습니다.
+
+# ── 구글 시트 (폼 응답이 쌓이는 시트) ──────────────────────────
+sheet:
+  # 시트 주소 https://docs.google.com/spreadsheets/d/【여기】/edit 부분
+  spreadsheet_id: ""
+  # 비워두면 첫 번째 탭(폼 응답 탭)을 사용
+  worksheet: ""
+  # 폼 질문 제목과 똑같이 적어야 합니다
+  columns:
+    account: "계정"
+    video: "영상"
+    yt_title: "유튜브 제목"
+    body: "본문 (인스타·쓰레드·페북)"
+    tiktok_body: "틱톡 본문"
+    platforms: "플랫폼"
+
+# 폼 '플랫폼' 체크박스 문구 → 봇 내부 이름
+platform_labels:
+  인스타: instagram
+  쓰레드: threads
+  페이스북: facebook
+  유튜브: youtube
+  틱톡: tiktok
+
+# 폼 '계정' 선택지 문구 → 봇 내부 계정 이름
+account_labels:
+  A: A
+  B: B
+  C: C
+
+poll_seconds: 60          # 시트 확인 주기(초)
+max_retries: 3            # 실패 시 자동 재시도 횟수
+
+# 로그인 후 돌아올 주소 (GitHub Pages 에 올라간 callback.html)
+redirect_uri: "https://tjdals423-netizen.github.io/SNS_UPLOAD/callback.html"
+
+youtube:
+  privacy: private        # private / unlisted / public
+  category_id: "22"       # 22 = 인물/블로그
+
+tiktok:
+  privacy: SELF_ONLY      # 심사 전에는 SELF_ONLY(나만 보기)만 가능
+
+# ── Meta (페이스북 + 인스타) 앱 ──────────────────────────────
+meta:
+  app_id: ""
+  app_secret: ""
+  graph_version: "v23.0"
+
+# ── Threads 앱 (쓰레드봇 때 만든 앱의 'Threads 앱 ID') ────────
+threads:
+  app_id: ""
+  app_secret: ""
+
+# ── TikTok 앱 ────────────────────────────────────────────────
+tiktok_app:
+  client_key: ""
+  client_secret: ""
+
+# ── 텔레그램 알림 ────────────────────────────────────────────
+telegram:
+  bot_token: ""           # @BotFather 에게 받은 토큰
+
+# ── AI 캡션 (선택) ───────────────────────────────────────────
+# 키가 없으면 AI 없이: 빈 유튜브 제목은 본문 첫 줄, 빈 틱톡 본문은 공통 본문을 사용
+ai:
+  anthropic_api_key: ""   # 비워두면 환경변수 ANTHROPIC_API_KEY 사용
+  model: "claude-opus-5-5"
