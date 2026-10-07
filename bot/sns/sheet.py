@@ -41,7 +41,7 @@ class Sheet:
         values = data.get("values", [])
         if not values:
             return []
-        self.headers = values[0]
+        self.headers = [h.strip() for h in values[0]]
         self._ensure_columns()
         rows = []
         for i, raw in enumerate(values[1:], start=2):

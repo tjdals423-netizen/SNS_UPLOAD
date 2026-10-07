@@ -18,6 +18,7 @@ from sns.uploaders import meta, threads, tiktok, youtube
 
 log = logging.getLogger("bot")
 LOCK_TIMEOUT = timedelta(hours=2)
+RETRY_AFTER = timedelta(minutes=10)
 HOST = socket.gethostname()
 
 
@@ -36,11 +37,20 @@ def fail_count(cell: str) -> int:
     return int(m.group(1)) if m else 0
 
 
+def retry_due(status: str) -> bool:
+    """'일부실패|시각' 이면 마지막 시도 후 RETRY_AFTER 가 지났는지."""
+    try:
+        return datetime.now() - datetime.fromisoformat(status.split("|")[1]) >= RETRY_AFTER
+    except Exception:
+        return True
+
+
 def pending_platforms(cfg, row, platforms) -> list[str]:
+    due = retry_due(row.values.get(STATUS_COL, ""))
     todo = []
     for p in platforms:
         cell = row.values.get(RESULT_COLS[p], "")
-        if not cell or (cell.startswith("실패") and fail_count(cell) < cfg.get("max_retries", 3)):
+        if not cell or (due and cell.startswith("실패") and fail_count(cell) < cfg.get("max_retries", 3)):
             todo.append(p)
     return todo
 
@@ -114,13 +124,14 @@ def process_row(cfg, drive, sheet, row) -> None:
                 pass
 
     ok = all(r.startswith("완료") for r in results.values())
-    sheet.write(row, STATUS_COL, "완료" if ok else "일부실패")
+    now = datetime.now().isoformat(timespec="seconds")
+    sheet.write(row, STATUS_COL, "완료" if ok else f"일부실패|{now}")
 
     lines = [f"{'✅' if ok else '⚠️'} 계정 {account} 업로드 ({row.number}행)"]
     for p, r in results.items():
         lines.append(f"• {PLATFORM_KO[p]}: {r}")
     if not ok:
-        lines.append(f"\n실패한 건 최대 {cfg.get('max_retries', 3)}번까지 자동 재시도합니다. 바로 다시 하려면 시트의 해당 결과 칸을 지우세요.")
+        lines.append(f"\n실패한 건 10분 간격으로 최대 {cfg.get('max_retries', 3)}번까지 자동 재시도합니다. 바로 다시 하려면 시트의 해당 결과 칸을 지우세요.")
     notify.send(cfg, "\n".join(lines))
 
 
