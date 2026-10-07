@@ -55,10 +55,10 @@ def pending_platforms(cfg, row, platforms) -> list[str]:
     return todo
 
 
-def build_comment(cfg, raw: str) -> str:
-    """댓글 칸에 숫자만 쓰면 comment_template 의 {번호} 자리에 넣어줌."""
+def build_comment(cfg, raw: str, tpl_key: str = "comment_template") -> str:
+    """댓글 칸에 숫자만 쓰면 템플릿의 {번호} 자리에 넣어줌. 인스타 템플릿이 없으면 공통 템플릿 사용."""
     raw = (raw or "").strip()
-    tpl = cfg.get("comment_template") or ""
+    tpl = cfg.get(tpl_key) or cfg.get("comment_template") or ""
     if tpl and raw.isdigit():
         return tpl.replace("{번호}", raw)
     return raw
@@ -91,7 +91,9 @@ def process_row(cfg, drive, sheet, row) -> None:
     path = None
     file_id = None
     results = {}
-    comment = build_comment(cfg, v.get(cols.get("comment", "댓글"), ""))
+    raw_comment = v.get(cols.get("comment", "댓글"), "")
+    comment = build_comment(cfg, raw_comment)
+    ig_comment = build_comment(cfg, raw_comment, "comment_template_instagram")
     text_for_tiktok = ""
     try:
         file_id = file_id_from_url(v[cols["video"]].split(",")[0])
@@ -112,7 +114,7 @@ def process_row(cfg, drive, sheet, row) -> None:
                         youtube.add_pending(account, res, comment)
                         res += " (댓글: 공개 전환되면 자동)"
                 elif p == "instagram":
-                    res = meta.upload_instagram(cfg, account, path, text["instagram"], comment)
+                    res = meta.upload_instagram(cfg, account, path, text["instagram"], ig_comment)
                 elif p == "facebook":
                     res = meta.upload_facebook(cfg, account, path, text["facebook"], comment)
                 elif p == "threads":
