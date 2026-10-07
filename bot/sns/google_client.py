@@ -18,6 +18,7 @@ OWNER_SCOPES = [
 YOUTUBE_SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.readonly",
+    "https://www.googleapis.com/auth/youtube.force-ssl",
 ]
 
 
@@ -75,6 +76,11 @@ def download(drive, file_id: str, dest_dir: Path) -> Path:
         while not done:
             _, done = dl.next_chunk()
     return path
+
+
+def trash(drive, file_id: str) -> None:
+    """업로드 끝난 원본 영상을 휴지통으로 (30일 뒤 구글이 자동 삭제)."""
+    drive.files().update(fileId=file_id, body={"trashed": True}).execute()
 
 
 class PublicLink:

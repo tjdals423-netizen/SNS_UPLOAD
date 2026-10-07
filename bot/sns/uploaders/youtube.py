@@ -1,6 +1,18 @@
+import json
+import logging
+import time
+
 from googleapiclient.http import MediaFileUpload
 
+from ..config import SECRETS_DIR
 from ..google_client import youtube_service
+
+log = logging.getLogger(__name__)
+
+# 비공개 영상엔 댓글을 못 달아서, 공개로 바뀌면 그때 다는 대기열
+PENDING_PATH = SECRETS_DIR / "youtube_comments.json"
+CHECK_EVERY = 600          # 공개 여부 확인 주기(초) — 유튜브 할당량 절약
+EXPIRE_AFTER = 14 * 86400  # 2주 안에 공개 안 되면 포기
 
 
 def upload(cfg: dict, account: str, path, title: str) -> str:
@@ -22,3 +34,60 @@ def upload(cfg: dict, account: str, path, title: str) -> str:
     while resp is None:
         _, resp = req.next_chunk()
     return f"https://youtu.be/{resp['id']}"
+
+
+def _load() -> list:
+    if not PENDING_PATH.exists():
+        return []
+    with open(PENDING_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _save(items: list) -> None:
+    SECRETS_DIR.mkdir(parents=True, exist_ok=True)
+    with open(PENDING_PATH, "w", encoding="utf-8") as f:
+        json.dump(items, f, ensure_ascii=False, indent=2)
+
+
+def add_pending(account: str, video_url: str, comment: str) -> None:
+    items = _load()
+    items.append({"account": account, "video_id": video_url.rsplit("/", 1)[-1], "comment": comment, "added": time.time(), "checked": 0})
+    _save(items)
+
+
+def flush_pending() -> list[str]:
+    """공개로 바뀐 영상에 댓글 달기. 알림 메시지 목록을 돌려줌."""
+    items, keep, msgs = _load(), [], []
+    if not items:
+        return msgs
+    now = time.time()
+    for it in items:
+        if now - it.get("checked", 0) < CHECK_EVERY:
+            keep.append(it)
+            continue
+        it["checked"] = now
+        vid = it["video_id"]
+        try:
+            yt = youtube_service(it["account"])
+            found = yt.videos().list(part="status", id=vid).execute().get("items", [])
+            if not found:
+                continue  # 영상이 삭제됨
+            if found[0]["status"]["privacyStatus"] == "public":
+                yt.commentThreads().insert(
+                    part="snippet",
+                    body={"snippet": {"videoId": vid, "topLevelComment": {"snippet": {"textOriginal": it["comment"]}}}},
+                ).execute()
+                msgs.append(f"💬 유튜브 댓글 완료 ({it['account']}) https://youtu.be/{vid}")
+                continue
+            if now - it["added"] > EXPIRE_AFTER:
+                msgs.append(f"⌛ 2주 동안 공개되지 않아 유튜브 댓글을 포기했어요 ({it['account']}) https://youtu.be/{vid}")
+                continue
+        except Exception as e:
+            log.warning("유튜브 댓글 처리 실패 %s: %s", vid, e)
+            it["errors"] = it.get("errors", 0) + 1
+            if it["errors"] >= 5:
+                msgs.append(f"❗ 유튜브 댓글 실패 ({it['account']}) https://youtu.be/{vid}: {str(e)[:150]}")
+                continue
+        keep.append(it)
+    _save(keep)
+    return msgs

@@ -28,7 +28,7 @@ def _token(account: str) -> dict:
     return info
 
 
-def upload(cfg: dict, account: str, drive, file_id: str, text: str) -> str:
+def upload(cfg: dict, account: str, drive, file_id: str, text: str, comment: str = "") -> str:
     info = _token(account)
     uid, token = info["user_id"], info["token"]
     with PublicLink(drive, file_id) as video_url:
@@ -48,6 +48,27 @@ def upload(cfg: dict, account: str, drive, file_id: str, text: str) -> str:
     pub = check(requests.post(f"{API}/{uid}/threads_publish", data={"creation_id": c["id"], "access_token": token}, timeout=60))
     try:
         d = check(requests.get(f"{API}/{pub['id']}", params={"fields": "permalink", "access_token": token}, timeout=30))
-        return d.get("permalink") or pub["id"]
+        link = d.get("permalink") or pub["id"]
     except Exception:
-        return pub["id"]
+        link = pub["id"]
+    if comment:
+        link += " " + _reply(uid, token, pub["id"], comment)
+    return link
+
+
+def _reply(uid: str, token: str, post_id: str, comment: str) -> str:
+    """내 게시물에 답글 달기. 실패해도 게시 자체는 성공으로 둠."""
+    try:
+        time.sleep(5)
+        c = check(
+            requests.post(
+                f"{API}/{uid}/threads",
+                data={"media_type": "TEXT", "text": comment[:500], "reply_to_id": post_id, "access_token": token},
+                timeout=60,
+            )
+        )
+        time.sleep(5)
+        check(requests.post(f"{API}/{uid}/threads_publish", data={"creation_id": c["id"], "access_token": token}, timeout=60))
+        return "(댓글✅)"
+    except Exception as e:
+        return f"(댓글❌ {str(e)[:120]})"

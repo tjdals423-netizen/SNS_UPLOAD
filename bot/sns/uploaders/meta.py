@@ -1,5 +1,6 @@
 """페이스북 페이지(릴스) + 인스타그램(릴스) 업로드. 둘 다 페이지 토큰 사용."""
 import os
+import time
 
 import requests
 
@@ -35,7 +36,14 @@ def _account(section: str, account: str) -> dict:
 
 
 # ── 인스타그램 릴스 ─────────────────────────────────────────────
-def upload_instagram(cfg: dict, account: str, path, caption: str) -> str:
+def upload_instagram(cfg: dict, account: str, path, caption: str, comment: str = "") -> str:
+    link, media_id, token = _post_instagram(cfg, account, path, caption)
+    if comment:
+        link += " " + _comment(cfg, media_id, token, comment)
+    return link
+
+
+def _post_instagram(cfg: dict, account: str, path, caption: str):
     info = _account("instagram", account)
     g, token, ig = _graph(cfg), info["token"], info["ig_id"]
     r = requests.post(
@@ -60,13 +68,33 @@ def upload_instagram(cfg: dict, account: str, path, caption: str) -> str:
     pub = check(requests.post(f"{g}/{ig}/media_publish", data={"creation_id": container["id"], "access_token": token}, timeout=60))
     try:
         link = check(requests.get(f"{g}/{pub['id']}", params={"fields": "permalink", "access_token": token}, timeout=30))
-        return link.get("permalink") or pub["id"]
+        return link.get("permalink") or pub["id"], pub["id"], token
     except Exception:
-        return pub["id"]
+        return pub["id"], pub["id"], token
 
 
 # ── 페이스북 페이지 릴스 (실패하면 일반 동영상으로) ────────────────
-def upload_facebook(cfg: dict, account: str, path, caption: str) -> str:
+def upload_facebook(cfg: dict, account: str, path, caption: str, comment: str = "") -> str:
+    link, post_id, token = _post_facebook(cfg, account, path, caption)
+    if comment:
+        link += " " + _comment(cfg, post_id, token, comment)
+    return link
+
+
+def _comment(cfg: dict, object_id: str, token: str, comment: str) -> str:
+    """페북/인스타 공용 댓글. 영상 처리 중이면 거절될 수 있어 몇 번 재시도."""
+    err = None
+    for _ in range(6):
+        try:
+            check(requests.post(f"{_graph(cfg)}/{object_id}/comments", data={"message": comment, "access_token": token}, timeout=60))
+            return "(댓글✅)"
+        except UploadError as e:
+            err = e
+            time.sleep(20)
+    return f"(댓글❌ {str(err)[:120]})"
+
+
+def _post_facebook(cfg: dict, account: str, path, caption: str):
     info = _account("facebook", account)
     g, token, page = _graph(cfg), info["page_token"], info["page_id"]
     try:
@@ -86,7 +114,7 @@ def upload_facebook(cfg: dict, account: str, path, caption: str) -> str:
                 timeout=120,
             )
         )
-        return f"https://www.facebook.com/reel/{vid}"
+        return f"https://www.facebook.com/reel/{vid}", vid, token
     except UploadError as reels_err:
         # 릴스 조건(세로/길이)에 안 맞으면 일반 동영상으로 게시
         try:
@@ -98,6 +126,6 @@ def upload_facebook(cfg: dict, account: str, path, caption: str) -> str:
                     timeout=3600,
                 )
             d = check(r)
-            return f"https://www.facebook.com/{page}/videos/{d['id']}"
+            return f"https://www.facebook.com/{page}/videos/{d['id']}", d["id"], token
         except UploadError as video_err:
             raise UploadError(f"릴스 실패({reels_err}) / 일반영상 실패({video_err})")

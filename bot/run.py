@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 from sns import captions, notify
 from sns.config import PLATFORM_KO, PLATFORMS, TMP_DIR, load_config, setup_logging
-from sns.google_client import download, file_id_from_url, owner_services
+from sns.google_client import download, file_id_from_url, owner_services, trash
 from sns.sheet import RESULT_COLS, STATUS_COL, Sheet
 from sns.uploaders import meta, threads, tiktok, youtube
 
@@ -55,6 +55,15 @@ def pending_platforms(cfg, row, platforms) -> list[str]:
     return todo
 
 
+def build_comment(cfg, raw: str) -> str:
+    """댓글 칸에 숫자만 쓰면 comment_template 의 {번호} 자리에 넣어줌."""
+    raw = (raw or "").strip()
+    tpl = cfg.get("comment_template") or ""
+    if tpl and raw.isdigit():
+        return tpl.replace("{번호}", raw)
+    return raw
+
+
 def is_locked(status: str) -> bool:
     if not status.startswith("처리중"):
         return False
@@ -80,7 +89,9 @@ def process_row(cfg, drive, sheet, row) -> None:
     log.info("%d행 처리 시작: 계정 %s, %s", row.number, account, ",".join(todo))
 
     path = None
+    file_id = None
     results = {}
+    comment = build_comment(cfg, v.get(cols.get("comment", "댓글"), ""))
     text_for_tiktok = ""
     try:
         file_id = file_id_from_url(v[cols["video"]].split(",")[0])
@@ -97,12 +108,15 @@ def process_row(cfg, drive, sheet, row) -> None:
             try:
                 if p == "youtube":
                     res = youtube.upload(cfg, account, path, text["youtube"])
+                    if comment:
+                        youtube.add_pending(account, res, comment)
+                        res += " (댓글: 공개 전환되면 자동)"
                 elif p == "instagram":
-                    res = meta.upload_instagram(cfg, account, path, text["instagram"])
+                    res = meta.upload_instagram(cfg, account, path, text["instagram"], comment)
                 elif p == "facebook":
-                    res = meta.upload_facebook(cfg, account, path, text["facebook"])
+                    res = meta.upload_facebook(cfg, account, path, text["facebook"], comment)
                 elif p == "threads":
-                    res = threads.upload(cfg, account, drive, file_id, text["threads"])
+                    res = threads.upload(cfg, account, drive, file_id, text["threads"], comment)
                 else:
                     res = tiktok.upload(cfg, account, path, text["tiktok"])
                 cell = f"완료 {res}"
@@ -129,6 +143,13 @@ def process_row(cfg, drive, sheet, row) -> None:
     now = datetime.now().isoformat(timespec="seconds")
     sheet.write(row, STATUS_COL, "완료" if ok else f"일부실패|{now}")
 
+    # 모두 끝났으면 드라이브 원본 정리
+    if ok and file_id and cfg.get("trash_after_upload", True):
+        try:
+            trash(drive, file_id)
+        except Exception as e:
+            log.warning("드라이브 정리 실패: %s", e)
+
     lines = [f"{'✅' if ok else '⚠️'} 계정 {account} 업로드 ({row.number}행)"]
     for p, r in results.items():
         lines.append(f"• {PLATFORM_KO[p]}: {r}")
@@ -148,6 +169,8 @@ def run_once(cfg) -> None:
             process_row(cfg, drive, sheet, row)
         except Exception:
             log.exception("%d행 처리 중 오류", row.number)
+    for msg in youtube.flush_pending():
+        notify.send(cfg, msg)
 
 
 def main() -> None:

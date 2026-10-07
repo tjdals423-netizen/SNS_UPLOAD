@@ -49,7 +49,8 @@ def setup_meta(cfg):
         "2) 오른쪽 'Meta 앱'에서 이 봇용 앱 선택\n"
         "3) '사용자 또는 페이지'는 '사용자 토큰'\n"
         "4) 권한 추가: pages_show_list, pages_read_engagement, pages_manage_posts,\n"
-        "   instagram_basic, instagram_content_publish, business_management\n"
+        "   pages_manage_engagement, instagram_basic, instagram_content_publish,\n"
+        "   instagram_manage_comments, business_management\n"
         "5) 'Generate Access Token' → 페이지를 모두 체크하고 계속\n"
         "6) 위쪽 '액세스 토큰' 칸의 긴 값을 복사\n"
     )
@@ -90,7 +91,7 @@ def setup_threads(cfg):
         {
             "client_id": t["app_id"],
             "redirect_uri": cfg["redirect_uri"],
-            "scope": "threads_basic,threads_content_publish",
+            "scope": "threads_basic,threads_content_publish,threads_manage_replies",
             "response_type": "code",
         },
     )
