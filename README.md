@@ -54,9 +54,23 @@ https://tjdals423-netizen.github.io/SNS_UPLOAD/callback.html
 - 폼 응답 시트 오른쪽에 `상태`, `결과_유튜브` … 칸이 자동으로 생깁니다.
 - 실패하면 최대 3번 자동 재시도. 바로 다시 올리려면 해당 `결과_…` 칸을 지우면 됩니다.
 
-## 집 PC 로 옮길 때
-1. 이 저장소를 내려받고
-2. 기존 PC 의 `bot/config.yaml` 과 `bot/secrets/` 폴더를 그대로 복사
-3. `start_bot.bat` 실행
+## 다른 PC 로 옮길 때 (집 PC 등)
+1. [python.org](https://www.python.org/downloads/) 에서 파이썬 설치 — 첫 화면의 **"Add python.exe to PATH" 꼭 체크**
+2. 이 저장소를 **Code → Download ZIP** 으로 받아 `C:\SNS_UPLOAD` 에 압축 해제 (안에 바로 `bot` 폴더가 보이게)
+3. 기존 PC 의 `bot/config.yaml` 과 `bot/secrets/` 폴더를 같은 위치에 복사 (USB / 카톡 나에게 보내기 등 **나만 받는 곳**으로)
+4. `bot/start_bot.bat` 실행 → 처음엔 설치 때문에 1~2분 → 텔레그램에 "업로드 봇 시작" 오면 완료
+5. (선택) `Win + R` → `shell:startup` 에 `start_bot.bat` 바로가기 넣기
 
 ⚠️ 두 PC 에서 **동시에** 켜두지 마세요 (같은 영상이 두 번 올라갈 수 있음).
+⚠️ `secrets/` 와 `config.yaml` 은 비밀번호와 같습니다. 절대 GitHub 등 공개된 곳에 올리지 마세요.
+
+## 자주 쓰는 설정 (`bot/config.yaml`)
+| 설정 | 설명 |
+|---|---|
+| `comment_template` | 유튜브·페북·쓰레드 댓글. 폼 `댓글` 칸에 숫자를 쓰면 `{번호}` 자리에 들어감 |
+| `instagram_comment` | 인스타는 항상 이 문구로 댓글 |
+| `youtube.comment_wait_minutes` | 업로드 후 이 시간(분) 안에 유튜브를 공개로 바꾸면 댓글 자동 |
+| `drive_cleanup` | `delete` 업로드 성공 시 드라이브 원본 영구 삭제 / `trash` 휴지통 / `off` |
+| `tiktok.mode` | `inbox` 틱톡 초안으로 보내기 (기본) |
+
+설정을 바꾼 뒤에는 `start_bot.bat` 을 껐다 켜야 적용됩니다.
