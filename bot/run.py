@@ -113,7 +113,7 @@ def process_row(cfg, drive, sheet, row) -> None:
                     res = youtube.upload(cfg, account, path, text["youtube"])
                     if comment:
                         youtube.add_pending(account, res, comment)
-                        res += " (댓글: 공개 전환되면 자동)"
+                        res += f" (댓글: {cfg.get('youtube', {}).get('comment_wait_minutes', 20)}분 안에 공개하면 자동)"
                 elif p == "instagram":
                     res = meta.upload_instagram(cfg, account, path, text["instagram"], ig_comment)
                 elif p == "facebook":
@@ -173,7 +173,7 @@ def run_once(cfg) -> None:
             process_row(cfg, drive, sheet, row)
         except Exception:
             log.exception("%d행 처리 중 오류", row.number)
-    for msg in youtube.flush_pending():
+    for msg in youtube.flush_pending(cfg):
         notify.send(cfg, msg)
 
 

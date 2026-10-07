@@ -50,6 +50,7 @@ redirect_uri: "https://tjdals423-netizen.github.io/SNS_UPLOAD/callback.html"
 youtube:
   privacy: private        # private / unlisted / public
   category_id: "22"       # 22 = 인물/블로그
+  comment_wait_minutes: 20  # 업로드 후 이 시간 안에 공개로 바꾸면 댓글 자동 (지나면 댓글만 건너뜀)
 
 tiktok:
   mode: inbox             # inbox = 틱톡 앱 초안으로 보내기 / direct = 바로 게시(심사 전엔 비공개 계정만)

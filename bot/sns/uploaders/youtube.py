@@ -11,8 +11,8 @@ log = logging.getLogger(__name__)
 
 # 비공개 영상엔 댓글을 못 달아서, 공개로 바뀌면 그때 다는 대기열
 PENDING_PATH = SECRETS_DIR / "youtube_comments.json"
-CHECK_EVERY = 600          # 공개 여부 확인 주기(초) — 유튜브 할당량 절약
-EXPIRE_AFTER = 14 * 86400  # 2주 안에 공개 안 되면 포기
+CHECK_EVERY = 60           # 공개 여부 확인 주기(초)
+DEFAULT_WAIT_MIN = 20      # 업로드 후 이 시간(분) 안에 공개되면 댓글, 지나면 건너뜀
 
 
 def upload(cfg: dict, account: str, path, title: str) -> str:
@@ -55,12 +55,13 @@ def add_pending(account: str, video_url: str, comment: str) -> None:
     _save(items)
 
 
-def flush_pending() -> list[str]:
+def flush_pending(cfg: dict) -> list[str]:
     """공개로 바뀐 영상에 댓글 달기. 알림 메시지 목록을 돌려줌."""
     items, keep, msgs = _load(), [], []
     if not items:
         return msgs
     now = time.time()
+    wait = cfg.get("youtube", {}).get("comment_wait_minutes", DEFAULT_WAIT_MIN) * 60
     for it in items:
         if now - it.get("checked", 0) < CHECK_EVERY:
             keep.append(it)
@@ -79,8 +80,8 @@ def flush_pending() -> list[str]:
                 ).execute()
                 msgs.append(f"💬 유튜브 댓글 완료 ({it['account']}) https://youtu.be/{vid}")
                 continue
-            if now - it["added"] > EXPIRE_AFTER:
-                msgs.append(f"⌛ 2주 동안 공개되지 않아 유튜브 댓글을 포기했어요 ({it['account']}) https://youtu.be/{vid}")
+            if now - it["added"] > wait:
+                msgs.append(f"ℹ️ {wait // 60:.0f}분 안에 공개되지 않아 유튜브 댓글은 건너뛰었어요. 업로드는 정상입니다 ({it['account']}) https://youtu.be/{vid}")
                 continue
         except Exception as e:
             log.warning("유튜브 댓글 처리 실패 %s: %s", vid, e)
