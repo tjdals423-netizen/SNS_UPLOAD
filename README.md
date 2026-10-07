@@ -26,7 +26,7 @@
 https://tjdals423-netizen.github.io/SNS_UPLOAD/callback.html
 ```
 
-- **Meta 앱(페북+인스타)**: 앱 대시보드 → 페이스북 로그인 → 설정 → *유효한 OAuth 리디렉션 URI*
+- (페북+인스타는 등록 필요 없음 — 그래프 API 탐색기 토큰 사용)
 - **Threads 앱**: 사용 사례 → Threads API → 설정 → *콜백 URL 리디렉션*
 - **TikTok 앱**: Login Kit → *Redirect URI*
 

@@ -42,29 +42,25 @@ def setup_youtube(cfg):
 def setup_meta(cfg):
     m = cfg["meta"]
     ver = m.get("graph_version", "v23.0")
-    code = ask_code(
-        f"https://www.facebook.com/{ver}/dialog/oauth",
-        {
-            "client_id": m["app_id"],
-            "redirect_uri": cfg["redirect_uri"],
-            "response_type": "code",
-            "scope": "pages_show_list,pages_read_engagement,pages_manage_posts,"
-            "instagram_basic,instagram_content_publish,business_management",
-        },
-    )
     g = f"https://graph.facebook.com/{ver}"
-    short = requests.get(
-        f"{g}/oauth/access_token",
-        params={"client_id": m["app_id"], "client_secret": m["app_secret"], "redirect_uri": cfg["redirect_uri"], "code": code},
-        timeout=30,
-    ).json()
-    if "access_token" not in short:
-        raise SystemExit(f"토큰 발급 실패: {short}")
+    print(
+        "\n[그래프 API 탐색기에서 토큰 받기]\n"
+        "1) 브라우저에서 https://developers.facebook.com/tools/explorer 열기\n"
+        "2) 오른쪽 'Meta 앱'에서 이 봇용 앱 선택\n"
+        "3) '사용자 또는 페이지'는 '사용자 토큰'\n"
+        "4) 권한 추가: pages_show_list, pages_read_engagement, pages_manage_posts,\n"
+        "   instagram_basic, instagram_content_publish, business_management\n"
+        "5) 'Generate Access Token' → 페이지를 모두 체크하고 계속\n"
+        "6) 위쪽 '액세스 토큰' 칸의 긴 값을 복사\n"
+    )
+    short_token = input("복사한 액세스 토큰을 붙여넣고 Enter: ").strip()
     long = requests.get(
         f"{g}/oauth/access_token",
-        params={"grant_type": "fb_exchange_token", "client_id": m["app_id"], "client_secret": m["app_secret"], "fb_exchange_token": short["access_token"]},
+        params={"grant_type": "fb_exchange_token", "client_id": m["app_id"], "client_secret": m["app_secret"], "fb_exchange_token": short_token},
         timeout=30,
     ).json()
+    if "access_token" not in long:
+        raise SystemExit(f"토큰 변환 실패 (앱 ID/시크릿이 탐색기에서 고른 앱과 같은지 확인): {long}")
     pages = requests.get(
         f"{g}/me/accounts",
         params={"fields": "id,name,access_token,instagram_business_account{id,username}", "access_token": long["access_token"], "limit": 100},
