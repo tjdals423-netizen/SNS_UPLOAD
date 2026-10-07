@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 from sns import captions, notify
 from sns.config import PLATFORM_KO, PLATFORMS, TMP_DIR, load_config, setup_logging
-from sns.google_client import download, file_id_from_url, owner_services, trash
+from sns.google_client import download, file_id_from_url, owner_services, cleanup
 from sns.sheet import RESULT_COLS, STATUS_COL, Sheet
 from sns.uploaders import meta, threads, tiktok, youtube
 
@@ -144,9 +144,10 @@ def process_row(cfg, drive, sheet, row) -> None:
     sheet.write(row, STATUS_COL, "완료" if ok else f"일부실패|{now}")
 
     # 모두 끝났으면 드라이브 원본 정리
-    if ok and file_id and cfg.get("trash_after_upload", True):
+    mode = cfg.get("drive_cleanup", "delete")
+    if ok and file_id and mode in ("delete", "trash"):
         try:
-            trash(drive, file_id)
+            cleanup(drive, file_id, mode)
         except Exception as e:
             log.warning("드라이브 정리 실패: %s", e)
 

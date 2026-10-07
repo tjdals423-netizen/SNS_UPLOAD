@@ -21,8 +21,9 @@ sheet:
 # 문장을 직접 쓰면 그 문장이 그대로 댓글로 달림. 비워두면 댓글 없음.
 comment_template: "프로필 링크에서 {번호}번 검색해 보세요 🙌"
 
-# 모든 플랫폼 업로드가 끝나면 드라이브 원본 영상을 휴지통으로 (30일 뒤 자동 삭제)
-trash_after_upload: true
+# 업로드가 모두 성공하면 드라이브 원본 영상 정리
+#   delete = 영구 삭제 (용량 바로 확보) / trash = 휴지통 / off = 그대로 둠
+drive_cleanup: delete
 
 # 폼 '플랫폼' 체크박스 문구 → 봇 내부 이름
 platform_labels:

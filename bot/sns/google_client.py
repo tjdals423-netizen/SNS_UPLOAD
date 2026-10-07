@@ -78,9 +78,12 @@ def download(drive, file_id: str, dest_dir: Path) -> Path:
     return path
 
 
-def trash(drive, file_id: str) -> None:
-    """업로드 끝난 원본 영상을 휴지통으로 (30일 뒤 구글이 자동 삭제)."""
-    drive.files().update(fileId=file_id, body={"trashed": True}).execute()
+def cleanup(drive, file_id: str, mode: str) -> None:
+    """업로드 끝난 원본 영상 정리. delete = 영구 삭제(용량 바로 확보), trash = 휴지통."""
+    if mode == "delete":
+        drive.files().delete(fileId=file_id).execute()
+    elif mode == "trash":
+        drive.files().update(fileId=file_id, body={"trashed": True}).execute()
 
 
 class PublicLink:
