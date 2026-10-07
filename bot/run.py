@@ -10,7 +10,7 @@ import sys
 import time
 from datetime import datetime, timedelta
 
-from sns import captions, notify
+from sns import captions, hints, notify
 from sns.config import PLATFORM_KO, PLATFORMS, TMP_DIR, load_config, setup_logging
 from sns.google_client import download, file_id_from_url, owner_services, cleanup
 from sns.sheet import RESULT_COLS, STATUS_COL, Sheet
@@ -91,6 +91,7 @@ def process_row(cfg, drive, sheet, row) -> None:
     path = None
     file_id = None
     results = {}
+    fix_hints = []
     raw_comment = v.get(cols.get("comment", "댓글"), "")
     comment = build_comment(cfg, raw_comment)
     # 인스타는 고정 문구를 항상 사용 (설정이 비어 있으면 공통 댓글)
@@ -127,10 +128,12 @@ def process_row(cfg, drive, sheet, row) -> None:
                 log.exception("%s 업로드 실패", p)
                 prev = fail_count(row.values.get(RESULT_COLS[p], ""))
                 cell = f"실패{prev + 1}: {str(e)[:300]}"
+                fix_hints.append(hints.for_failure(p, account, str(e)))
             results[p] = cell
             sheet.write(row, RESULT_COLS[p], cell)
     except Exception as e:
         log.exception("%d행 준비 실패", row.number)
+        fix_hints.append(hints.for_failure("google", account, str(e)))
         for p in todo:
             prev = fail_count(row.values.get(RESULT_COLS[p], ""))
             results[p] = f"실패{prev + 1}: {str(e)[:300]}"
@@ -158,6 +161,8 @@ def process_row(cfg, drive, sheet, row) -> None:
     for p, r in results.items():
         lines.append(f"• {PLATFORM_KO[p]}: {r}")
     if not ok:
+        for h in dict.fromkeys(h for h in fix_hints if h):
+            lines.append("\n" + h)
         lines.append(f"\n실패한 건 10분 간격으로 최대 {cfg.get('max_retries', 3)}번까지 자동 재시도합니다. 바로 다시 하려면 시트의 해당 결과 칸을 지우세요.")
     notify.send(cfg, "\n".join(lines))
     if results.get("tiktok", "").startswith("완료 초안") and text_for_tiktok:
