@@ -177,7 +177,7 @@ def run_once(cfg) -> None:
         notify.send(cfg, msg)
 
 
-STATE = {"started": datetime.now(), "last_check": None, "last_error": None}
+STATE = {"started": datetime.now(), "last_check": None, "last_error": None, "token_checked": None, "token_issues": []}
 STATUS_ICON = {"완료": "✅", "일부실패": "⚠️", "처리중": "🔄", "": "⏳"}
 
 
@@ -200,6 +200,9 @@ def status_text(cfg) -> str:
     ]
     if STATE["last_error"]:
         lines.append(f"• 최근 오류: {STATE['last_error']}")
+    if STATE["token_checked"]:
+        lines.append(f"• 계정 연결: {'✅ 모두 정상' if not STATE['token_issues'] else '⚠️ 확인 필요'} ({_ago(STATE['token_checked'])} 점검)")
+        lines += [f"    - {i}" for i in STATE["token_issues"]]
     pending_yt = len(youtube._load())
     if pending_yt:
         lines.append(f"• 유튜브 댓글 대기: {pending_yt}건 (공개로 바꾸면 자동)")
@@ -228,6 +231,19 @@ def status_text(cfg) -> str:
     return "\n".join(lines)
 
 
+def daily_token_check(cfg) -> None:
+    from sns.maintenance import check_tokens
+
+    try:
+        STATE["token_issues"] = check_tokens(cfg)
+    except Exception as e:
+        log.exception("토큰 점검 실패")
+        STATE["token_issues"] = [f"점검 중 오류: {str(e)[:100]}"]
+    STATE["token_checked"] = datetime.now()
+    if STATE["token_issues"]:
+        notify.send(cfg, "🔑 계정 연결 점검 — 확인이 필요해요\n" + "\n".join(f"• {i}" for i in STATE["token_issues"]))
+
+
 def main() -> None:
     setup_logging()
     cfg = load_config()
@@ -245,6 +261,8 @@ def main() -> None:
     if not once:
         notify.send(cfg, f"🤖 업로드 봇 시작 ({HOST})\n상태 확인: /status")
     while True:
+        if not once and (STATE["token_checked"] is None or datetime.now() - STATE["token_checked"] > timedelta(hours=24)):
+            daily_token_check(cfg)
         try:
             run_once(cfg)
             STATE["last_check"] = datetime.now()

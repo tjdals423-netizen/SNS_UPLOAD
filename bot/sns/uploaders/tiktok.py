@@ -36,6 +36,8 @@ def refresh(cfg: dict, account: str, info: dict) -> dict:
         "refresh_token": d.get("refresh_token", info["refresh_token"]),
         "expires_at": time.time() + d.get("expires_in", 86400),
     }
+    if d.get("refresh_expires_in"):
+        info["refresh_expires_at"] = time.time() + d["refresh_expires_in"]
     update_token("tiktok", account, info)
     return info
 
