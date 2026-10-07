@@ -55,10 +55,10 @@ def pending_platforms(cfg, row, platforms) -> list[str]:
     return todo
 
 
-def build_comment(cfg, raw: str, tpl_key: str = "comment_template") -> str:
-    """댓글 칸에 숫자만 쓰면 템플릿의 {번호} 자리에 넣어줌. 인스타 템플릿이 없으면 공통 템플릿 사용."""
+def build_comment(cfg, raw: str) -> str:
+    """댓글 칸에 숫자만 쓰면 comment_template 의 {번호} 자리에 넣어줌."""
     raw = (raw or "").strip()
-    tpl = cfg.get(tpl_key) or cfg.get("comment_template") or ""
+    tpl = cfg.get("comment_template") or ""
     if tpl and raw.isdigit():
         return tpl.replace("{번호}", raw)
     return raw
@@ -93,7 +93,8 @@ def process_row(cfg, drive, sheet, row) -> None:
     results = {}
     raw_comment = v.get(cols.get("comment", "댓글"), "")
     comment = build_comment(cfg, raw_comment)
-    ig_comment = build_comment(cfg, raw_comment, "comment_template_instagram")
+    # 인스타는 고정 문구를 항상 사용 (설정이 비어 있으면 공통 댓글)
+    ig_comment = (cfg.get("instagram_comment") or "").strip() or comment
     text_for_tiktok = ""
     try:
         file_id = file_id_from_url(v[cols["video"]].split(",")[0])
