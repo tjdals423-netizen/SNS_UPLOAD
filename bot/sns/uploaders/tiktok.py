@@ -1,4 +1,8 @@
-"""틱톡 Content Posting API (Direct Post). 심사 전에는 SELF_ONLY(나만 보기)로 올라감."""
+"""틱톡 Content Posting API.
+
+- inbox (기본): 틱톡 앱 받은편지함(초안)으로 보냄 → 앱에서 본문 붙여넣고 게시. 심사 없이 공개 계정에 사용 가능.
+- direct: 바로 게시. 심사 전에는 비공개 계정에만 가능.
+"""
 import mimetypes
 import os
 import time
@@ -48,11 +52,7 @@ def _token(cfg, account) -> str:
 def upload(cfg: dict, account: str, path, caption: str) -> str:
     token = _token(cfg, account)
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=UTF-8"}
-
-    creator = check(requests.post(f"{API}/post/publish/creator_info/query/", headers=headers, timeout=30))["data"]
-    want = cfg.get("tiktok", {}).get("privacy", "SELF_ONLY")
-    options = creator.get("privacy_level_options") or [want]
-    privacy = want if want in options else ("SELF_ONLY" if "SELF_ONLY" in options else options[0])
+    direct = cfg.get("tiktok", {}).get("mode", "inbox") == "direct"
 
     size = os.path.getsize(path)
     if size <= 64 * MB:
@@ -61,28 +61,27 @@ def upload(cfg: dict, account: str, path, caption: str) -> str:
         chunk = 10 * MB
         count = size // chunk  # 마지막 조각이 나머지를 포함
 
-    init = check(
-        requests.post(
-            f"{API}/post/publish/video/init/",
-            headers=headers,
-            json={
-                "post_info": {
-                    "title": caption,
-                    "privacy_level": privacy,
-                    "disable_duet": False,
-                    "disable_comment": False,
-                    "disable_stitch": False,
-                },
-                "source_info": {
-                    "source": "FILE_UPLOAD",
-                    "video_size": size,
-                    "chunk_size": chunk,
-                    "total_chunk_count": count,
-                },
+    source_info = {"source": "FILE_UPLOAD", "video_size": size, "chunk_size": chunk, "total_chunk_count": count}
+    if direct:
+        creator = check(requests.post(f"{API}/post/publish/creator_info/query/", headers=headers, timeout=30))["data"]
+        want = cfg.get("tiktok", {}).get("privacy", "SELF_ONLY")
+        options = creator.get("privacy_level_options") or [want]
+        privacy = want if want in options else ("SELF_ONLY" if "SELF_ONLY" in options else options[0])
+        url = f"{API}/post/publish/video/init/"
+        body = {
+            "post_info": {
+                "title": caption,
+                "privacy_level": privacy,
+                "disable_duet": False,
+                "disable_comment": False,
+                "disable_stitch": False,
             },
-            timeout=60,
-        )
-    )["data"]
+            "source_info": source_info,
+        }
+    else:
+        url = f"{API}/post/publish/inbox/video/init/"
+        body = {"source_info": source_info}
+    init = check(requests.post(url, headers=headers, json=body, timeout=60))["data"]
 
     ctype = mimetypes.guess_type(str(path))[0] or "video/mp4"
     with open(path, "rb") as f:
@@ -105,4 +104,4 @@ def upload(cfg: dict, account: str, path, caption: str) -> str:
         return d.get("status"), d.get("fail_reason")
 
     wait_until(status, done={"PUBLISH_COMPLETE", "SEND_TO_USER_INBOX"}, failed={"FAILED"}, timeout=900)
-    return f"게시완료({privacy})"
+    return f"게시완료({privacy})" if direct else "초안 전송 → 틱톡 앱 알림에서 게시"

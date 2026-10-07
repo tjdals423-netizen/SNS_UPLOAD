@@ -121,7 +121,7 @@ def setup_tiktok(cfg):
         {
             "client_key": app["client_key"],
             "redirect_uri": cfg["redirect_uri"],
-            "scope": "user.info.basic,video.publish",
+            "scope": "user.info.basic,video.upload,video.publish",
             "response_type": "code",
         },
     )

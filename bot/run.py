@@ -81,6 +81,7 @@ def process_row(cfg, drive, sheet, row) -> None:
 
     path = None
     results = {}
+    text_for_tiktok = ""
     try:
         file_id = file_id_from_url(v[cols["video"]].split(",")[0])
         path = download(drive, file_id, TMP_DIR)
@@ -91,6 +92,7 @@ def process_row(cfg, drive, sheet, row) -> None:
             v.get(cols["tiktok_body"], ""),
             todo,
         )
+        text_for_tiktok = text["tiktok"]
         for p in todo:
             try:
                 if p == "youtube":
@@ -133,6 +135,9 @@ def process_row(cfg, drive, sheet, row) -> None:
     if not ok:
         lines.append(f"\n실패한 건 10분 간격으로 최대 {cfg.get('max_retries', 3)}번까지 자동 재시도합니다. 바로 다시 하려면 시트의 해당 결과 칸을 지우세요.")
     notify.send(cfg, "\n".join(lines))
+    if results.get("tiktok", "").startswith("완료 초안") and text_for_tiktok:
+        notify.send(cfg, f"📋 틱톡 본문 ({account}) — 길게 눌러 복사하세요")
+        notify.send(cfg, text_for_tiktok)
 
 
 def run_once(cfg) -> None:

@@ -41,7 +41,8 @@ youtube:
   category_id: "22"       # 22 = 인물/블로그
 
 tiktok:
-  privacy: SELF_ONLY      # 심사 전에는 SELF_ONLY(나만 보기)만 가능
+  mode: inbox             # inbox = 틱톡 앱 초안으로 보내기 / direct = 바로 게시(심사 전엔 비공개 계정만)
+  privacy: SELF_ONLY      # direct 모드일 때 공개 범위
 
 # ── Meta (페이스북 + 인스타) 앱 ──────────────────────────────
 meta:
