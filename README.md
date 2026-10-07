@@ -45,8 +45,16 @@ https://tjdals423-netizen.github.io/SNS_UPLOAD/callback.html
 
 ---
 
-## 실행
-`bot/start_bot.bat` 더블클릭. 창을 켜두면 1분마다 시트를 확인합니다.
+## 실행 / 끄기
+| 파일 | 하는 일 |
+|---|---|
+| `bot/start_bot.bat` | **백그라운드로 실행** (창 없음). 텔레그램에 "업로드 봇 시작" 알림 |
+| `bot/stop_bot.bat` | 백그라운드 봇 끄기 |
+| `bot/start_bot_console.bat` | 창을 띄워서 실행 (오류 확인용) |
+
+이미 켜져 있으면 두 번 실행되지 않습니다.
+
+**텔레그램 명령**: `/status` 봇 상태·최근 업로드 / `/help` 명령어 목록
 
 **PC 켤 때 자동 실행**: `Win + R` → `shell:startup` → 열린 폴더에 `start_bot.bat` 바로가기 넣기
 

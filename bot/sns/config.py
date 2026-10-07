@@ -55,12 +55,10 @@ def update_token(section: str, key: str, value) -> None:
 
 
 def setup_logging() -> None:
+    import sys
+
     LOG_DIR.mkdir(parents=True, exist_ok=True)
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=[
-            logging.FileHandler(LOG_DIR / "bot.log", encoding="utf-8"),
-            logging.StreamHandler(),
-        ],
-    )
+    handlers = [logging.FileHandler(LOG_DIR / "bot.log", encoding="utf-8")]
+    if sys.stderr is not None:  # 백그라운드(pythonw) 실행이면 화면 출력 없음
+        handlers.append(logging.StreamHandler())
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", handlers=handlers)

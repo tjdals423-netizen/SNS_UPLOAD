@@ -177,18 +177,81 @@ def run_once(cfg) -> None:
         notify.send(cfg, msg)
 
 
+STATE = {"started": datetime.now(), "last_check": None, "last_error": None}
+STATUS_ICON = {"완료": "✅", "일부실패": "⚠️", "처리중": "🔄", "": "⏳"}
+
+
+def _ago(t: datetime) -> str:
+    s = int((datetime.now() - t).total_seconds())
+    if s < 60:
+        return f"{s}초 전"
+    if s < 3600:
+        return f"{s // 60}분 전"
+    return f"{s // 3600}시간 {s % 3600 // 60}분 전"
+
+
+def status_text(cfg) -> str:
+    up = datetime.now() - STATE["started"]
+    lines = [
+        "🤖 업로드 봇 상태",
+        f"• PC: {HOST}",
+        f"• 켜진 지: {up.days}일 {up.seconds // 3600}시간 {up.seconds % 3600 // 60}분" if up.days else f"• 켜진 지: {up.seconds // 3600}시간 {up.seconds % 3600 // 60}분",
+        f"• 마지막 시트 확인: {_ago(STATE['last_check']) if STATE['last_check'] else '아직 없음'}",
+    ]
+    if STATE["last_error"]:
+        lines.append(f"• 최근 오류: {STATE['last_error']}")
+    pending_yt = len(youtube._load())
+    if pending_yt:
+        lines.append(f"• 유튜브 댓글 대기: {pending_yt}건 (공개로 바꾸면 자동)")
+
+    _, sheets = owner_services()
+    rows = Sheet(sheets, cfg).read()
+    cols = cfg["sheet"]["columns"]
+    counts = {"완료": 0, "일부실패": 0, "처리중": 0, "": 0}
+    for r in rows:
+        st = r.values.get(STATUS_COL, "").split("|")[0]
+        counts[st if st in counts else ""] += 1
+    lines.append(f"• 전체 {len(rows)}건: ✅완료 {counts['완료']} · ⚠️실패 {counts['일부실패']} · 🔄처리중 {counts['처리중']} · ⏳대기 {counts['']}")
+
+    if rows:
+        lines.append("\n최근 업로드")
+        for r in rows[-5:][::-1]:
+            st = r.values.get(STATUS_COL, "").split("|")[0]
+            ts = r.values.get("타임스탬프", "")
+            acct = r.values.get(cols["account"], "")
+            title = (r.values.get(cols["yt_title"], "") or r.values.get(cols["body"], "")).strip().splitlines()
+            title = title[0][:20] if title else ""
+            lines.append(f"{STATUS_ICON.get(st, '⏳')} {r.number}행 {acct} · {title} ({ts.split(". ", 1)[-1].rsplit(":", 1)[0]})")
+            if st == "일부실패":
+                bad = [PLATFORM_KO[p] for p, c in RESULT_COLS.items() if r.values.get(c, "").startswith("실패")]
+                lines.append(f"    실패: {', '.join(bad)}")
+    return "\n".join(lines)
+
+
 def main() -> None:
     setup_logging()
     cfg = load_config()
     once = "--once" in sys.argv
+    if not once:
+        from sns import single
+
+        if not single.acquire():
+            log.info("이미 실행 중이라 종료합니다")
+            return
+        from sns.telegram_bot import CommandListener, help_text
+
+        CommandListener(cfg, {"status": lambda: status_text(cfg), "help": help_text, "start": help_text}).start()
     log.info("업로드 봇 시작 (%s)", HOST)
     if not once:
-        notify.send(cfg, f"🤖 업로드 봇 시작 ({HOST})")
+        notify.send(cfg, f"🤖 업로드 봇 시작 ({HOST})\n상태 확인: /status")
     while True:
         try:
             run_once(cfg)
+            STATE["last_check"] = datetime.now()
+            STATE["last_error"] = None
         except Exception as e:
             log.exception("시트 확인 실패")
+            STATE["last_error"] = f"{datetime.now():%H:%M} {str(e)[:150]}"
             notify.send(cfg, f"❗ 업로드 봇 오류: {str(e)[:300]}")
         if once:
             break
