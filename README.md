@@ -109,6 +109,7 @@
 | `/status` 에 답이 없음 | 봇이 꺼진 상태 → `start_bot.bat` 실행 |
 | 폼을 냈는데 아무 반응 없음 | 폼 질문·선택지 글자가 바뀌지 않았는지 (위 1번), `/status` 로 대기 건수 확인 |
 | 원인을 모르겠음 | `bot/logs/bot.log` 파일, 또는 `stop_bot.bat` 후 `start_bot_console.bat` 로 창을 띄워 오류 확인 |
+| 실패에 `10053` / `10054` / `Connection aborted` / `timed out` | 인터넷이 잠깐 끊긴 것 (계정 문제 아님). **집 PC 는 와이파이(USB 무선랜) 대신 랜선을 직접 꽂기** → 봇 재시작 없이 자동 재시도 |
 | 쓰레드 실패에 `Session has expired` 등 토큰 에러 | 위 5번의 **쓰레드 연결이 끊겼을 때** 순서대로 setup 4번 |
 | 특정 플랫폼만 계속 실패 | `setup.bat` → 7번(점검)으로 연결 상태 확인 |
 

@@ -67,5 +67,9 @@ def for_failure(p: str, account: str, err: str) -> str:
     if p == "youtube" and QUOTA_ERR.search(err):
         return "⏳ 유튜브 하루 업로드 한도 초과 → 오후 4~5시 이후 시트 결과_유튜브 칸을 지우면 다시 올라감"
     if NETWORK_ERR.search(err):
-        return "🌐 인터넷 연결이 끊겨서 실패했어요 (계정 문제 아님). 자동 재시도를 기다리거나 인터넷(랜선/와이파이)을 확인하세요."
+        return (
+            "🌐 인터넷 연결이 끊겨서 실패했어요 (계정 문제 아님).\n"
+            "• 집 PC 라면: 와이파이(USB 무선랜)는 큰 영상 올릴 때 잘 끊겨요 → 랜선을 PC 에 직접 꽂으세요\n"
+            "• 랜선 연결 후엔 봇 재시작 필요 없음. 10분 뒤 자동 재시도되고, 바로 하려면 시트의 실패한 결과 칸을 지우세요"
+        )
     return ""
