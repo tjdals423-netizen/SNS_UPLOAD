@@ -20,7 +20,7 @@
 - `bot/config.yaml` 열어서 값 채우기 (시트 ID, 앱 ID/시크릿, 텔레그램 토큰)
 
 ### 2. 각 개발자 사이트에 '로그인 후 돌아올 주소' 등록
-아래 주소를 **세 곳 모두**에 등록합니다.
+아래 주소를 **쓰레드·틱톡 앱**에 등록합니다.
 
 ```
 https://tjdals423-netizen.github.io/SNS_UPLOAD/callback.html
