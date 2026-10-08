@@ -1,13 +1,14 @@
 """구글 로그인(폼 주인 계정: 드라이브/시트, 채널별: 유튜브)과 드라이브 도우미."""
 import io
 import re
+from contextlib import contextmanager
 from pathlib import Path
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
 from .config import GOOGLE_CLIENT_PATH, load_tokens, update_token
 
@@ -76,6 +77,38 @@ def download(drive, file_id: str, dest_dir: Path) -> Path:
         while not done:
             _, done = dl.next_chunk()
     return path
+
+
+def download_image_jpeg(drive, file_id: str, dest_dir: Path) -> Path:
+    """썸네일 이미지를 받아 JPEG 로 변환 (인스타·페북 커버는 JPEG 가 가장 안전)."""
+    from PIL import Image
+
+    raw = download(drive, file_id, dest_dir)
+    jpg = raw.with_name(raw.stem + "_cover.jpg")
+    with Image.open(raw) as im:
+        im.convert("RGB").save(jpg, "JPEG", quality=92)
+    if raw != jpg:
+        raw.unlink(missing_ok=True)
+    return jpg
+
+
+@contextmanager
+def public_image(drive, path):
+    """인스타 커버처럼 '공개 URL'이 필요할 때: 드라이브에 잠깐 올려 링크 공개 → 끝나면 삭제."""
+    if not path:
+        yield None
+        return
+    f = drive.files().create(
+        body={"name": path.name}, media_body=MediaFileUpload(str(path), mimetype="image/jpeg"), fields="id"
+    ).execute()
+    try:
+        drive.permissions().create(fileId=f["id"], body={"type": "anyone", "role": "reader"}).execute()
+        yield f"https://drive.usercontent.google.com/download?id={f['id']}&export=download&confirm=t"
+    finally:
+        try:
+            drive.files().delete(fileId=f["id"]).execute()
+        except Exception:
+            pass
 
 
 def cleanup(drive, file_id: str, mode: str) -> None:

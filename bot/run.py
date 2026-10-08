@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 from sns import captions, hints, notify
 from sns.config import PLATFORM_KO, PLATFORMS, TMP_DIR, load_config, setup_logging
-from sns.google_client import download, file_id_from_url, owner_services, cleanup
+from sns.google_client import cleanup, download, download_image_jpeg, file_id_from_url, owner_services, public_image
 from sns.sheet import RESULT_COLS, STATUS_COL, Sheet
 from sns.uploaders import meta, threads, tiktok, youtube
 
@@ -90,6 +90,8 @@ def process_row(cfg, drive, sheet, row) -> None:
 
     path = None
     file_id = None
+    thumb_path = None
+    thumb_id = None
     results = {}
     fix_hints = []
     raw_comment = v.get(cols.get("comment", "댓글"), "")
@@ -100,6 +102,13 @@ def process_row(cfg, drive, sheet, row) -> None:
     try:
         file_id = file_id_from_url(v[cols["video"]].split(",")[0])
         path = download(drive, file_id, TMP_DIR)
+        raw_thumb = v.get(cols.get("thumbnail", "썸네일"), "")
+        if raw_thumb and any(p in todo for p in ("instagram", "facebook")):
+            try:
+                thumb_id = file_id_from_url(raw_thumb.split(",")[0])
+                thumb_path = download_image_jpeg(drive, thumb_id, TMP_DIR)
+            except Exception as e:
+                log.warning("썸네일 준비 실패: %s", e)
         text = captions.build(
             cfg,
             v.get(cols["yt_title"], ""),
@@ -116,9 +125,10 @@ def process_row(cfg, drive, sheet, row) -> None:
                         youtube.add_pending(account, res, comment)
                         res += f" (댓글: {cfg.get('youtube', {}).get('comment_wait_minutes', 20)}분 안에 공개하면 자동)"
                 elif p == "instagram":
-                    res = meta.upload_instagram(cfg, account, path, text["instagram"], ig_comment)
+                    with public_image(drive, thumb_path) as cover_url:
+                        res = meta.upload_instagram(cfg, account, path, text["instagram"], ig_comment, cover_url)
                 elif p == "facebook":
-                    res = meta.upload_facebook(cfg, account, path, text["facebook"], comment)
+                    res = meta.upload_facebook(cfg, account, path, text["facebook"], comment, thumb_path)
                 elif p == "threads":
                     res = threads.upload(cfg, account, drive, file_id, text["threads"], comment)
                 else:
@@ -139,11 +149,12 @@ def process_row(cfg, drive, sheet, row) -> None:
             results[p] = f"실패{prev + 1}: {str(e)[:300]}"
             sheet.write(row, RESULT_COLS[p], results[p])
     finally:
-        if path and path.exists():
-            try:
-                path.unlink()
-            except OSError:
-                pass
+        for f in (path, thumb_path):
+            if f and f.exists():
+                try:
+                    f.unlink()
+                except OSError:
+                    pass
 
     ok = all(r.startswith("완료") for r in results.values())
     now = datetime.now().isoformat(timespec="seconds")
@@ -151,11 +162,14 @@ def process_row(cfg, drive, sheet, row) -> None:
 
     # 모두 끝났으면 드라이브 원본 정리
     mode = cfg.get("drive_cleanup", "delete")
-    if ok and file_id and mode in ("delete", "trash"):
-        try:
-            cleanup(drive, file_id, mode)
-        except Exception as e:
-            log.warning("드라이브 정리 실패: %s", e)
+    if ok and mode in ("delete", "trash"):
+        for fid in (file_id, thumb_id):
+            if not fid:
+                continue
+            try:
+                cleanup(drive, fid, mode)
+            except Exception as e:
+                log.warning("드라이브 정리 실패: %s", e)
 
     lines = [f"{'✅' if ok else '⚠️'} 계정 {account} 업로드 ({row.number}행)"]
     for p, r in results.items():
