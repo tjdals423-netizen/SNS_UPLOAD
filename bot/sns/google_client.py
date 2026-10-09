@@ -10,6 +10,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
+from . import watchdog
 from .config import GOOGLE_CLIENT_PATH, load_tokens, update_token
 
 OWNER_SCOPES = [
@@ -75,6 +76,7 @@ def download(drive, file_id: str, dest_dir: Path) -> Path:
         dl = MediaIoBaseDownload(fh, req, chunksize=16 * 1024 * 1024)
         done = False
         while not done:
+            watchdog.beat()
             _, done = dl.next_chunk()
     return path
 

@@ -5,7 +5,8 @@ from sns.single import PID_FILE, pid_alive
 
 pid = int(PID_FILE.read_text().strip() or 0) if PID_FILE.exists() else 0
 if pid and pid_alive(pid):
-    subprocess.run(["taskkill", "/PID", str(pid), "/F"], capture_output=True)
+    # /T: 감시자가 띄운 봇(자식 프로세스)까지 함께 끔
+    subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True)
     print(f"업로드 봇을 껐습니다. (PID {pid})")
 else:
     print("실행 중인 봇이 없습니다.")

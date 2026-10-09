@@ -4,6 +4,7 @@ import time
 
 from googleapiclient.http import MediaFileUpload
 
+from .. import watchdog
 from ..config import SECRETS_DIR
 from ..google_client import youtube_service
 
@@ -32,6 +33,7 @@ def upload(cfg: dict, account: str, path, title: str) -> str:
     req = yt.videos().insert(part="snippet,status", body=body, media_body=media)
     resp = None
     while resp is None:
+        watchdog.beat()
         _, resp = req.next_chunk()
     return f"https://youtu.be/{resp['id']}"
 

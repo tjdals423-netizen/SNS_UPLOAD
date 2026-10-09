@@ -4,13 +4,14 @@
   python run.py --once   한 번만 확인하고 종료
 """
 import logging
+import os
 import re
 import socket
 import sys
 import time
 from datetime import datetime, timedelta
 
-from sns import captions, hints, notify
+from sns import captions, hints, notify, watchdog
 from sns.config import PLATFORM_KO, PLATFORMS, TMP_DIR, load_config, setup_logging
 from sns.google_client import cleanup, download, download_image_jpeg, file_id_from_url, owner_services, public_image
 from sns.sheet import RESULT_COLS, STATUS_COL, Sheet
@@ -68,7 +69,10 @@ def is_locked(status: str) -> bool:
     if not status.startswith("처리중"):
         return False
     try:
-        ts = datetime.fromisoformat(status.split("|")[2])
+        _, host, t = status.split("|")[:3]
+        ts = datetime.fromisoformat(t)
+        if host == HOST and ts < STATE["started"]:
+            return False  # 이 PC 의 봇이 재시작되기 전에 하던 건 → 이어서 처리
         return datetime.now() - ts < LOCK_TIMEOUT
     except Exception:
         return False
@@ -118,6 +122,7 @@ def process_row(cfg, drive, sheet, row) -> None:
         )
         text_for_tiktok = text["tiktok"]
         for p in todo:
+            watchdog.beat()
             try:
                 if p == "youtube":
                     res = youtube.upload(cfg, account, path, text["youtube"])
@@ -188,6 +193,7 @@ def run_once(cfg) -> None:
     drive, sheets = owner_services()
     sheet = Sheet(sheets, cfg)
     for row in sheet.read():
+        watchdog.beat()
         try:
             process_row(cfg, drive, sheet, row)
         except Exception:
@@ -196,6 +202,7 @@ def run_once(cfg) -> None:
         notify.send(cfg, msg)
 
 
+RESTARTS = int(os.environ.get("SNS_RESTARTS", "0"))
 STATE = {"started": datetime.now(), "last_check": None, "last_error": None, "token_checked": None, "token_issues": []}
 STATUS_ICON = {"완료": "✅", "일부실패": "⚠️", "처리중": "🔄", "": "⏳"}
 
@@ -217,6 +224,8 @@ def status_text(cfg) -> str:
         f"• 켜진 지: {up.days}일 {up.seconds // 3600}시간 {up.seconds % 3600 // 60}분" if up.days else f"• 켜진 지: {up.seconds // 3600}시간 {up.seconds % 3600 // 60}분",
         f"• 마지막 시트 확인: {_ago(STATE['last_check']) if STATE['last_check'] else '아직 없음'}",
     ]
+    if RESTARTS:
+        lines.append(f"• 자동 복구: {RESTARTS}번 다시 켜짐 (원인은 bot.log)")
     if STATE["last_error"]:
         lines.append(f"• 최근 오류: {STATE['last_error']}")
     if STATE["token_checked"]:
@@ -267,19 +276,29 @@ def main() -> None:
     setup_logging()
     cfg = load_config()
     once = "--once" in sys.argv
-    if not once:
+    child = "--child" in sys.argv
+    # 응답 없는 연결 때문에 영원히 멈추지 않도록 (개별 timeout 이 없는 곳 대비)
+    socket.setdefaulttimeout(120)
+    if not once and not child:
         from sns import single
 
         if not single.acquire():
             log.info("이미 실행 중이라 종료합니다")
             return
+        # 감시자: 실제 봇을 따로 띄우고, 꺼지거나 멈추면 다시 켬
+        watchdog.supervise(cfg, HOST)
+        return
+    if not once:
         from sns.telegram_bot import CommandListener, help_text
+
+        watchdog.start(cfg, HOST)
 
         CommandListener(cfg, {"status": lambda: status_text(cfg), "help": help_text, "start": help_text}).start()
     log.info("업로드 봇 시작 (%s)", HOST)
     if not once:
         notify.send(cfg, f"🤖 업로드 봇 시작 ({HOST})\n상태 확인: /status")
     while True:
+        watchdog.beat()
         if not once and (STATE["token_checked"] is None or datetime.now() - STATE["token_checked"] > timedelta(hours=24)):
             daily_token_check(cfg)
         try:

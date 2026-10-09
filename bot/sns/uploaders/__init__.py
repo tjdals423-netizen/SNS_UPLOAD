@@ -3,6 +3,8 @@ import time
 
 import requests
 
+from .. import watchdog
+
 
 class UploadError(Exception):
     pass
@@ -24,6 +26,7 @@ def wait_until(fn, done, failed, timeout=600, interval=5):
     """fn() 결과가 done 이 될 때까지 대기. failed 면 예외."""
     end = time.time() + timeout
     while time.time() < end:
+        watchdog.beat()
         status, detail = fn()
         if status in done:
             return status

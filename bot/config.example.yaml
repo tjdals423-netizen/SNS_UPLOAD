@@ -44,6 +44,7 @@ account_labels:
 
 poll_seconds: 60          # 시트 확인 주기(초)
 max_retries: 3            # 실패 시 자동 재시도 횟수
+watchdog_minutes: 30      # 이 시간(분) 넘게 진행이 없으면 멈춘 것으로 보고 자동으로 다시 켬
 
 # 로그인 후 돌아올 주소 (GitHub Pages 에 올라간 callback.html)
 redirect_uri: "https://tjdals423-netizen.github.io/SNS_UPLOAD/callback.html"
