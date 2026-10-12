@@ -36,6 +36,10 @@ platform_labels:
   유튜브: youtube
   틱톡: tiktok
 
+# 봇이 올리지 않을 플랫폼 (폼에서 체크해도 건너뜀). 예: [facebook]
+#   facebook — API로 올린 릴스 조회수가 거의 안 나와서 직접 올리는 중 (2026-10)
+disabled_platforms: []
+
 # 폼 '계정' 선택지 문구 → 봇 내부 계정 이름
 account_labels:
   A: A

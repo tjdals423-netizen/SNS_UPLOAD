@@ -30,7 +30,9 @@ def parse_platforms(cfg, raw: str) -> list[str]:
         p = labels.get(part.strip())
         if p and p not in out:
             out.append(p)
-    return [p for p in PLATFORMS if p in out]
+    # 설정에서 끈 플랫폼은 폼에서 체크해도 건너뜀
+    off = set(cfg.get("disabled_platforms") or [])
+    return [p for p in PLATFORMS if p in out and p not in off]
 
 
 def fail_count(cell: str) -> int:
