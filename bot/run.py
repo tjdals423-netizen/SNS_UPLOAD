@@ -11,7 +11,7 @@ import sys
 import time
 from datetime import datetime, timedelta
 
-from sns import captions, hints, notify, watchdog
+from sns import captions, fb_comments, hints, notify, watchdog
 from sns.config import PLATFORM_KO, PLATFORMS, TMP_DIR, load_config, setup_logging
 from sns.google_client import cleanup, download, download_image_jpeg, file_id_from_url, owner_services, public_image
 from sns.sheet import RESULT_COLS, STATUS_COL, Sheet
@@ -194,7 +194,8 @@ def process_row(cfg, drive, sheet, row) -> None:
 def run_once(cfg) -> None:
     drive, sheets = owner_services()
     sheet = Sheet(sheets, cfg)
-    for row in sheet.read():
+    rows = sheet.read()
+    for row in rows:
         watchdog.beat()
         try:
             process_row(cfg, drive, sheet, row)
@@ -202,6 +203,11 @@ def run_once(cfg) -> None:
             log.exception("%d행 처리 중 오류", row.number)
     for msg in youtube.flush_pending(cfg):
         notify.send(cfg, msg)
+    try:
+        for msg in fb_comments.run(cfg, rows, build_comment):
+            notify.send(cfg, msg)
+    except Exception:
+        log.exception("페북 자동 댓글 처리 중 오류")
 
 
 RESTARTS = int(os.environ.get("SNS_RESTARTS", "0"))
