@@ -101,29 +101,48 @@ def run(cfg: dict, rows: list, build_comment) -> list[str]:
         except Exception as e:
             log.warning("페북 릴스 확인 실패 %s: %s", acct, e)
             continue
+        new = []
         for reel in reversed(reels):  # 오래된 것부터
             if reel["id"] in done:
                 continue
-            created = datetime.fromisoformat(reel["created_time"].replace("+0000", "+00:00")).astimezone().replace(tzinfo=None)
-            if created < since:
+            reel["_created"] = datetime.fromisoformat(reel["created_time"].replace("+0000", "+00:00")).astimezone().replace(tzinfo=None)
+            reel["_desc"] = _norm(reel.get("description", ""))
+            if reel["_created"] < since:
                 done.add(reel["id"])  # 이 기능을 켜기 전에 올린 릴스는 건드리지 않음
                 continue
             if _page_already_commented(g, reel["id"], info):
                 done.add(reel["id"])  # 직접 댓글을 달았거나 이미 단 릴스
+                twin = next((c for c in cands if c["acct"] == acct and c["body"] and c["body"] == reel["_desc"]), None)
+                if twin:  # 그 릴스의 짝인 폼도 사용된 것으로 (다른 릴스에 잘못 붙지 않게)
+                    used.add(twin["row"])
+                    cands.remove(twin)
                 continue
-            mine = [c for c in cands if c["acct"] == acct and abs(c["ts"] - created) <= MATCH_WINDOW]
-            desc = _norm(reel.get("description", ""))
-            match = next((c for c in mine if c["body"] and c["body"] == desc), None)  # 본문이 같으면 확실
-            if not match and mine:
-                match = min(mine, key=lambda c: abs(c["ts"] - created))  # 아니면 가장 가까운 시간
-            if not match:
-                if now - created > GIVE_UP_AFTER:
-                    done.add(reel["id"])
+            new.append(reel)
+
+        # 1차: 본문이 같은 것끼리 먼저 짝짓기
+        pairs = []
+        for reel in new:
+            twin = next((c for c in cands if c["acct"] == acct and c["body"] and c["body"] == reel["_desc"]), None)
+            if twin:
+                pairs.append((reel, twin))
+                cands.remove(twin)
+        # 2차: 남은 릴스는 '폼 제출 후 12시간 안에 올라온' 경우만, 가장 가까운 폼과
+        for reel in new:
+            if any(r is reel for r, _ in pairs):
                 continue
+            created = reel["_created"]
+            mine = [c for c in cands if c["acct"] == acct and timedelta(minutes=-10) <= created - c["ts"] <= MATCH_WINDOW]
+            if mine:
+                twin = min(mine, key=lambda c: created - c["ts"])
+                pairs.append((reel, twin))
+                cands.remove(twin)
+            elif now - created > GIVE_UP_AFTER:
+                done.add(reel["id"])
+
+        for reel, match in pairs:
             result = meta._comment(cfg, reel["id"], info["page_token"], match["comment"])
             done.add(reel["id"])
             used.add(match["row"])
-            cands.remove(match)
             link = f"https://www.facebook.com/reel/{reel['id']}"
             if result.startswith("(댓글✅"):
                 msgs.append(f"💬 페북 댓글 완료 ({acct}, 폼 {match['row']}행) {link}")
