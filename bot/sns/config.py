@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
 import yaml
@@ -54,6 +55,25 @@ def update_token(section: str, key: str, value) -> None:
     save_tokens(tokens)
 
 
+SECRET_PATTERNS = [
+    (re.compile(r"bot\d{6,}:[A-Za-z0-9_-]{20,}"), "bot***"),  # 텔레그램 봇 토큰 (요청 주소에 들어감)
+    (re.compile(r"(access_token=)[^&\s'\"]+"), r"\1***"),
+]
+
+
+def redact(text: str) -> str:
+    for pat, rep in SECRET_PATTERNS:
+        text = pat.sub(rep, text)
+    return text
+
+
+class _RedactFormatter(logging.Formatter):
+    """오류 메시지에 섞여 들어온 토큰을 로그에 남기지 않음."""
+
+    def format(self, record):
+        return redact(super().format(record))
+
+
 def setup_logging() -> None:
     import sys
 
@@ -61,4 +81,7 @@ def setup_logging() -> None:
     handlers = [logging.FileHandler(LOG_DIR / "bot.log", encoding="utf-8")]
     if sys.stderr is not None:  # 백그라운드(pythonw) 실행이면 화면 출력 없음
         handlers.append(logging.StreamHandler())
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", handlers=handlers)
+    fmt = _RedactFormatter("%(asctime)s [%(levelname)s] %(message)s")
+    for h in handlers:
+        h.setFormatter(fmt)
+    logging.basicConfig(level=logging.INFO, handlers=handlers)
