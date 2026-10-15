@@ -23,7 +23,7 @@ RETRY_AFTER = timedelta(minutes=10)
 HOST = socket.gethostname()
 
 
-def parse_platforms(cfg, raw: str) -> list[str]:
+def parse_platforms(cfg, raw: str, account: str | None = None) -> list[str]:
     labels = cfg.get("platform_labels", {})
     out = []
     for part in re.split(r"\s*,\s*", raw or ""):
@@ -32,6 +32,8 @@ def parse_platforms(cfg, raw: str) -> list[str]:
             out.append(p)
     # 설정에서 끈 플랫폼은 폼에서 체크해도 건너뜀
     off = set(cfg.get("disabled_platforms") or [])
+    # 계정별로 끈 플랫폼 (그 계정에 연결이 없는 플랫폼 등)
+    off |= set((cfg.get("account_disabled_platforms") or {}).get(account) or [])
     return [p for p in PLATFORMS if p in out and p not in off]
 
 
@@ -84,7 +86,7 @@ def process_row(cfg, drive, sheet, row) -> None:
     cols = cfg["sheet"]["columns"]
     v = row.values
     account = cfg.get("account_labels", {}).get(v.get(cols["account"], "").strip())
-    platforms = parse_platforms(cfg, v.get(cols["platforms"], ""))
+    platforms = parse_platforms(cfg, v.get(cols["platforms"], ""), account)
     if not account or not platforms or not v.get(cols["video"]):
         return
     todo = pending_platforms(cfg, row, platforms)
