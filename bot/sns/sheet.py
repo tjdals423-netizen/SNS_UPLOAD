@@ -70,3 +70,16 @@ class Sheet:
             body={"values": [[value]]},
         ).execute()
         row.values[header] = value
+
+    def append(self, values: dict) -> None:
+        """폼 응답처럼 맨 아래에 한 줄 추가 (텔레그램 /upload 용). 같은 이름의 열이 여러 개면 모두 채움."""
+        if not self.headers:
+            self.read()
+        line = [values.get(h, "") for h in self.headers]
+        self.svc.values().append(
+            spreadsheetId=self.sid,
+            range=self._rng("A1"),
+            valueInputOption="RAW",
+            insertDataOption="OVERWRITE",
+            body={"values": [line]},
+        ).execute()

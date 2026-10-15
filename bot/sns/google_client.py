@@ -113,6 +113,28 @@ def public_image(drive, path):
             pass
 
 
+@contextmanager
+def temp_drive_file(drive, path, mimetype: str = "video/mp4"):
+    """PC 에 있는 파일을 드라이브에 잠깐 올려 file_id 를 돌려줌 (쓰레드처럼 공개 URL 이 필요할 때). 끝나면 삭제."""
+    f = drive.files().create(
+        body={"name": f"_tmp_{path.name}"},
+        media_body=MediaFileUpload(str(path), mimetype=mimetype, resumable=True, chunksize=16 * 1024 * 1024),
+        fields="id",
+    ).execute()
+    try:
+        yield f["id"]
+    finally:
+        try:
+            drive.files().delete(fileId=f["id"]).execute()
+        except Exception:
+            pass
+
+
+def is_local_path(value: str) -> bool:
+    """폼(드라이브 링크)이 아니라 PC 폴더 경로로 들어온 영상인지."""
+    return bool(re.match(r"^[A-Za-z]:[\\/]", (value or "").strip()))
+
+
 def cleanup(drive, file_id: str, mode: str) -> None:
     """업로드 끝난 원본 영상 정리. delete = 영구 삭제(용량 바로 확보), trash = 휴지통."""
     if mode == "delete":

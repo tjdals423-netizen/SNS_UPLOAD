@@ -10,10 +10,20 @@ import socket
 import sys
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from sns import captions, fb_comments, hints, notify, watchdog
 from sns.config import PLATFORM_KO, PLATFORMS, TMP_DIR, load_config, setup_logging
-from sns.google_client import cleanup, download, download_image_jpeg, file_id_from_url, owner_services, public_image
+from sns.google_client import (
+    cleanup,
+    download,
+    download_image_jpeg,
+    file_id_from_url,
+    is_local_path,
+    owner_services,
+    public_image,
+    temp_drive_file,
+)
 from sns.sheet import RESULT_COLS, STATUS_COL, Sheet
 from sns.uploaders import meta, threads, tiktok, youtube
 
@@ -107,9 +117,15 @@ def process_row(cfg, drive, sheet, row) -> None:
     # 인스타는 고정 문구를 항상 사용 (설정이 비어 있으면 공통 댓글)
     ig_comment = (cfg.get("instagram_comment") or "").strip() or comment
     text_for_tiktok = ""
+    local = is_local_path(v[cols["video"]])  # 텔레그램 /upload 로 들어온 PC 폴더 영상
     try:
-        file_id = file_id_from_url(v[cols["video"]].split(",")[0])
-        path = download(drive, file_id, TMP_DIR)
+        if local:
+            path = Path(v[cols["video"]].strip())
+            if not path.exists():
+                raise FileNotFoundError(f"영상 파일이 없습니다: {path}")
+        else:
+            file_id = file_id_from_url(v[cols["video"]].split(",")[0])
+            path = download(drive, file_id, TMP_DIR)
         raw_thumb = v.get(cols.get("thumbnail", "썸네일"), "")
         if raw_thumb and any(p in todo for p in ("instagram", "facebook")):
             try:
@@ -139,7 +155,11 @@ def process_row(cfg, drive, sheet, row) -> None:
                 elif p == "facebook":
                     res = meta.upload_facebook(cfg, account, path, text["facebook"], comment, thumb_path)
                 elif p == "threads":
-                    res = threads.upload(cfg, account, drive, file_id, text["threads"], comment)
+                    if local:  # 쓰레드는 공개 URL 이 필요해서 드라이브에 잠깐 올렸다가 지움
+                        with temp_drive_file(drive, path) as tmp_id:
+                            res = threads.upload(cfg, account, drive, tmp_id, text["threads"], comment)
+                    else:
+                        res = threads.upload(cfg, account, drive, file_id, text["threads"], comment)
                 else:
                     res = tiktok.upload(cfg, account, path, text["tiktok"])
                 cell = f"완료 {res}"
@@ -158,7 +178,8 @@ def process_row(cfg, drive, sheet, row) -> None:
             results[p] = f"실패{prev + 1}: {str(e)[:300]}"
             sheet.write(row, RESULT_COLS[p], results[p])
     finally:
-        for f in (path, thumb_path):
+        # 내려받은 임시 파일만 지움 (PC 폴더의 원본 영상은 절대 지우지 않음)
+        for f in ((None if local else path), thumb_path):
             if f and f.exists():
                 try:
                     f.unlink()
@@ -303,7 +324,17 @@ def main() -> None:
 
         watchdog.start(cfg, HOST)
 
-        CommandListener(cfg, {"status": lambda: status_text(cfg), "help": help_text, "start": help_text}).start()
+        from sns.tg_upload import UploadConversation
+
+        def append_row(values: dict) -> None:
+            _, sheets = owner_services()
+            Sheet(sheets, cfg).append(values)
+
+        CommandListener(
+            cfg,
+            {"status": lambda: status_text(cfg), "help": help_text, "start": help_text},
+            upload=UploadConversation(cfg, append_row),
+        ).start()
     log.info("업로드 봇 시작 (%s)", HOST)
     if not once:
         notify.send(cfg, f"🤖 업로드 봇 시작 ({HOST})\n상태 확인: /status")
