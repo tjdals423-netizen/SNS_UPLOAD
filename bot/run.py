@@ -8,6 +8,7 @@ import os
 import re
 import socket
 import sys
+import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -219,6 +220,8 @@ def run_once(cfg) -> None:
     sheet = Sheet(sheets, cfg)
     rows = sheet.read()
     for row in rows:
+        if STOP.is_set():
+            return  # /shutdown: 하던 행까지만 끝내고 종료
         watchdog.beat()
         try:
             process_row(cfg, drive, sheet, row)
@@ -234,6 +237,13 @@ def run_once(cfg) -> None:
 
 
 RESTARTS = int(os.environ.get("SNS_RESTARTS", "0"))
+STOP = threading.Event()  # 텔레그램 /shutdown
+
+
+def request_shutdown() -> str:
+    STOP.set()
+    log.info("텔레그램 /shutdown 요청")
+    return f"⏹ 끄는 중이에요 ({HOST}). 지금 올리는 영상이 있으면 그것까지 끝낸 뒤 꺼지고, 꺼지면 알려드릴게요."
 STATE = {"started": datetime.now(), "last_check": None, "last_error": None, "token_checked": None, "token_issues": []}
 STATUS_ICON = {"완료": "✅", "일부실패": "⚠️", "처리중": "🔄", "": "⏳"}
 
@@ -334,6 +344,8 @@ def main() -> None:
             cfg,
             {"status": lambda: status_text(cfg), "help": help_text, "start": help_text},
             upload=UploadConversation(cfg, append_row),
+            shutdown=request_shutdown,
+            host=HOST,
         ).start()
     log.info("업로드 봇 시작 (%s)", HOST)
     if not once:
@@ -352,7 +364,12 @@ def main() -> None:
             notify.send(cfg, f"❗ 업로드 봇 오류: {str(e)[:300]}")
         if once:
             break
-        time.sleep(cfg.get("poll_seconds", 60))
+        STOP.wait(cfg.get("poll_seconds", 60))
+        if STOP.is_set():
+            log.info("텔레그램 /shutdown 으로 종료합니다")
+            notify.send(cfg, f"⏹ 업로드 봇을 껐어요 ({HOST}). 다시 켜려면 그 PC 에서 start_bot.bat 을 실행하세요.")
+            logging.shutdown()
+            os._exit(watchdog.SHUTDOWN_EXIT)
 
 
 if __name__ == "__main__":

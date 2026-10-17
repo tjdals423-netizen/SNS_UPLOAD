@@ -15,6 +15,7 @@ from . import notify
 log = logging.getLogger(__name__)
 
 STUCK_EXIT = 3  # 멈춤 감지로 스스로 종료할 때의 종료 코드
+SHUTDOWN_EXIT = 4  # 텔레그램 /shutdown 으로 끈 것 → 다시 켜지 않음
 _last = time.monotonic()
 
 
@@ -50,6 +51,12 @@ def supervise(cfg: dict, host: str) -> None:
         started = time.monotonic()
         code = subprocess.call([sys.executable, os.path.abspath(sys.argv[0]), "--child"], env=env)
         lived = time.monotonic() - started
+        if code == SHUTDOWN_EXIT:
+            from .single import PID_FILE
+
+            log.info("텔레그램 /shutdown 으로 종료 → 다시 켜지 않습니다")
+            PID_FILE.unlink(missing_ok=True)
+            return
         restarts += 1
         log.warning("봇이 꺼졌습니다 (종료 코드 %s, %d초 실행) → 다시 켭니다", code, lived)
         if code != STUCK_EXIT:

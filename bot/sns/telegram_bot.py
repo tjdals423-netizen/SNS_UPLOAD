@@ -13,14 +13,16 @@ COMMANDS = [
     ("upload", "PC 폴더 영상 올리기 (완성본.mp4 + 캡션.txt)"),
     ("status", "봇 상태와 최근 업로드 보기"),
     ("cancel", "진행 중인 /upload 취소"),
+    ("shutdown", "이 PC 의 봇 끄기 (다른 PC 에서 켜기 전에)"),
     ("help", "명령어 목록"),
 ]
 
 
 class CommandListener(threading.Thread):
-    def __init__(self, cfg: dict, handlers: dict, upload=None):
+    def __init__(self, cfg: dict, handlers: dict, upload=None, shutdown=None, host: str = ""):
         super().__init__(daemon=True)
         self.cfg, self.handlers, self.upload = cfg, handlers, upload
+        self.shutdown, self.host = shutdown, host
         self.token = (cfg.get("telegram") or {}).get("bot_token")
         self.chat_id = None
 
@@ -48,6 +50,13 @@ class CommandListener(threading.Thread):
                 return self._reply(self.upload.start())
             if self.upload and cmd == "cancel":
                 return self._reply(self.upload.cancel())
+            if self.shutdown and cmd == "shutdown":
+                buttons = [[{"text": "⏹ 끄기", "callback_data": "sd:yes"}, {"text": "취소", "callback_data": "sd:no"}]]
+                return self._send(
+                    f"⏹ 업로드 봇을 끌까요?\nPC: {self.host}\n\n다른 PC 에서 켜기 전에 쓰는 기능이에요. "
+                    "이 PC 에서 다시 켜려면 start_bot.bat 을 실행하세요.",
+                    {"inline_keyboard": buttons},
+                )
             handler = self.handlers.get(cmd) or self.handlers.get("help")
             return self._send(handler())
         if self.upload and self.upload.active:
@@ -59,6 +68,17 @@ class CommandListener(threading.Thread):
         except Exception:
             pass
         data = cq.get("data") or ""
+        if data.startswith("sd:"):
+            m = cq.get("message") or {}
+            try:
+                self._api("editMessageReplyMarkup", chat_id=self.chat_id, message_id=m.get("message_id"), reply_markup={"inline_keyboard": []})
+            except Exception:
+                pass
+            if data == "sd:yes" and self.shutdown:
+                self._send(self.shutdown())
+            else:
+                self._send("취소했어요. 봇은 계속 켜져 있어요.")
+            return
         if self.upload and data.startswith("up:"):
             # 누른 버튼은 없애서 두 번 눌리지 않게
             m = cq.get("message") or {}
