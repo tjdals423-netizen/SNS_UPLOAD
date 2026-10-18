@@ -32,6 +32,12 @@ log = logging.getLogger("bot")
 LOCK_TIMEOUT = timedelta(hours=2)
 RETRY_AFTER = timedelta(minutes=10)
 HOST = socket.gethostname()
+PC_LABEL = HOST  # 알림에 보이는 PC 이름. main() 에서 설정(pc_names)으로 바꿈
+
+
+def pc_label(cfg) -> str:
+    """config.yaml 의 pc_names(컴퓨터 이름 → 표시 이름), 없으면 pc_name_default, 그것도 없으면 컴퓨터 이름."""
+    return (cfg.get("pc_names") or {}).get(HOST) or cfg.get("pc_name_default") or HOST
 
 
 def parse_platforms(cfg, raw: str, account: str | None = None) -> list[str]:
@@ -243,7 +249,7 @@ STOP = threading.Event()  # 텔레그램 /shutdown
 def request_shutdown() -> str:
     STOP.set()
     log.info("텔레그램 /shutdown 요청")
-    return f"⏹ 끄는 중이에요 ({HOST}). 지금 올리는 영상이 있으면 그것까지 끝낸 뒤 꺼지고, 꺼지면 알려드릴게요."
+    return f"⏹ 끄는 중이에요 ({PC_LABEL}). 지금 올리는 영상이 있으면 그것까지 끝낸 뒤 꺼지고, 꺼지면 알려드릴게요."
 STATE = {"started": datetime.now(), "last_check": None, "last_error": None, "token_checked": None, "token_issues": []}
 STATUS_ICON = {"완료": "✅", "일부실패": "⚠️", "처리중": "🔄", "": "⏳"}
 
@@ -261,7 +267,7 @@ def status_text(cfg) -> str:
     up = datetime.now() - STATE["started"]
     lines = [
         "🤖 업로드 봇 상태",
-        f"• PC: {HOST}",
+        f"• PC: {PC_LABEL}" + (f" ({HOST})" if PC_LABEL != HOST else ""),
         f"• 켜진 지: {up.days}일 {up.seconds // 3600}시간 {up.seconds % 3600 // 60}분" if up.days else f"• 켜진 지: {up.seconds // 3600}시간 {up.seconds % 3600 // 60}분",
         f"• 마지막 시트 확인: {_ago(STATE['last_check']) if STATE['last_check'] else '아직 없음'}",
     ]
@@ -314,8 +320,10 @@ def daily_token_check(cfg) -> None:
 
 
 def main() -> None:
+    global PC_LABEL
     setup_logging()
     cfg = load_config()
+    PC_LABEL = pc_label(cfg)
     once = "--once" in sys.argv
     child = "--child" in sys.argv
     # 응답 없는 연결 때문에 영원히 멈추지 않도록 (개별 timeout 이 없는 곳 대비)
@@ -327,12 +335,12 @@ def main() -> None:
             log.info("이미 실행 중이라 종료합니다")
             return
         # 감시자: 실제 봇을 따로 띄우고, 꺼지거나 멈추면 다시 켬
-        watchdog.supervise(cfg, HOST)
+        watchdog.supervise(cfg, PC_LABEL)
         return
     if not once:
         from sns.telegram_bot import CommandListener, help_text
 
-        watchdog.start(cfg, HOST)
+        watchdog.start(cfg, PC_LABEL)
 
         from sns.tg_upload import UploadConversation
 
@@ -345,11 +353,11 @@ def main() -> None:
             {"status": lambda: status_text(cfg), "help": help_text, "start": help_text},
             upload=UploadConversation(cfg, append_row),
             shutdown=request_shutdown,
-            host=HOST,
+            host=PC_LABEL,
         ).start()
-    log.info("업로드 봇 시작 (%s)", HOST)
+    log.info("업로드 봇 시작 (%s, %s)", PC_LABEL, HOST)
     if not once:
-        notify.send(cfg, f"🤖 업로드 봇 시작 ({HOST})\n상태 확인: /status")
+        notify.send(cfg, f"🤖 업로드 봇 시작 ({PC_LABEL})\n상태 확인: /status")
     while True:
         watchdog.beat()
         if not once and (STATE["token_checked"] is None or datetime.now() - STATE["token_checked"] > timedelta(hours=24)):
@@ -367,7 +375,7 @@ def main() -> None:
         STOP.wait(cfg.get("poll_seconds", 60))
         if STOP.is_set():
             log.info("텔레그램 /shutdown 으로 종료합니다")
-            notify.send(cfg, f"⏹ 업로드 봇을 껐어요 ({HOST}). 다시 켜려면 그 PC 에서 start_bot.bat 을 실행하세요.")
+            notify.send(cfg, f"⏹ 업로드 봇을 껐어요 ({PC_LABEL}). 다시 켜려면 그 PC 에서 start_bot.bat 을 실행하세요.")
             logging.shutdown()
             os._exit(watchdog.SHUTDOWN_EXIT)
 

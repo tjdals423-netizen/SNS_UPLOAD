@@ -171,6 +171,7 @@ Claude 에게 물어볼 때: *"`C:\SNS_UPLOAD` 에 있는 SNS 업로드 봇이�
 | `watchdog_minutes` | 이 시간(분) 넘게 진행이 없으면 멈춘 것으로 보고 자동으로 다시 켬 (기본 30) |
 | `disabled_platforms` | 봇이 올리지 않을 플랫폼. 예: `[facebook]` → 폼에서 페이스북을 체크해도 건너뜀 (직접 올릴 때) |
 | `account_disabled_platforms` | 계정별로 봇이 올리지 않을 플랫폼. 예: `{EVA: [tiktok]}` → EVA 는 틱톡을 체크해도 건너뜀 (연결이 없는 플랫폼) |
+| `pc_names` / `pc_name_default` | 텔레그램에 보이는 PC 이름. 예: `{회사컴퓨터이름: 회사 PC}`, 나머지 PC 는 `집 PC` |
 | `drive_cleanup` | `delete` 성공 시 원본 영구 삭제 / `trash` 휴지통 / `off` 그대로 |
 | `tiktok.mode` | `inbox` 틱톡 초안으로 보내기 (기본, 바꾸지 마세요) |
 | `poll_seconds` | 시트 확인 주기(초), 기본 60 |

@@ -49,6 +49,11 @@ account_labels:
 # 계정별로 봇이 올리지 않을 플랫폼 (그 계정에 연결이 없을 때). 폼에서 체크해도 건너뜀
 account_disabled_platforms: {}   # 예: {C: [tiktok]}
 
+# 텔레그램 알림에 보이는 PC 이름 (컴퓨터 이름 → 표시 이름). 목록에 없는 PC 는 pc_name_default
+pc_names:
+  회사컴퓨터이름: 회사 PC
+pc_name_default: 집 PC
+
 poll_seconds: 60          # 시트 확인 주기(초)
 max_retries: 3            # 실패 시 자동 재시도 횟수
 watchdog_minutes: 30      # 이 시간(분) 넘게 진행이 없으면 멈춘 것으로 보고 자동으로 다시 켬
