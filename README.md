@@ -172,6 +172,7 @@ Claude 에게 물어볼 때: *"`C:\SNS_UPLOAD` 에 있는 SNS 업로드 봇이�
 | `disabled_platforms` | 봇이 올리지 않을 플랫폼. 예: `[facebook]` → 폼에서 페이스북을 체크해도 건너뜀 (직접 올릴 때) |
 | `account_disabled_platforms` | 계정별로 봇이 올리지 않을 플랫폼. 예: `{EVA: [tiktok]}` → EVA 는 틱톡을 체크해도 건너뜀 (연결이 없는 플랫폼) |
 | `pc_names` / `pc_name_default` | 텔레그램에 보이는 PC 이름. 예: `{회사컴퓨터이름: 회사 PC}`, 나머지 PC 는 `집 PC` |
+| `allowed_emails` | 이 이메일로 낸 폼만 업로드 (폼에서 **이메일 주소 수집**을 켜야 함). 다른 사람이 낸 폼은 `차단` 표시 후 건너뛰고 텔레그램 `🚫` 알림. 텔레그램 `/upload` 는 검사 안 함 |
 | `drive_cleanup` | `delete` 성공 시 원본 영구 삭제 / `trash` 휴지통 / `off` 그대로 |
 | `tiktok.mode` | `inbox` 틱톡 초안으로 보내기 (기본, 바꾸지 마세요) |
 | `poll_seconds` | 시트 확인 주기(초), 기본 60 |

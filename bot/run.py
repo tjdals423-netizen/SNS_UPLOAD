@@ -99,6 +99,29 @@ def is_locked(status: str) -> bool:
         return False
 
 
+def check_sender(cfg, v: dict) -> str:
+    """허용된 사람이 낸 폼인지. 문제가 있으면 이유 문장, 괜찮으면 빈 문자열.
+
+    - 텔레그램 /upload 로 들어온 줄(영상 칸이 PC 경로)은 봇이 직접 쓴 것이라 통과
+    - allowed_emails 가 비어 있으면 검사 안 함
+    """
+    allowed = {e.strip().lower() for e in (cfg.get("allowed_emails") or []) if e and e.strip()}
+    if not allowed or is_local_path(v.get(cfg["sheet"]["columns"]["video"], "")):
+        return ""
+    # 이 기능을 켜기 전에 낸 폼(이메일 수집 전)은 검사하지 않음
+    since = cfg.get("allowed_emails_since")
+    ts = fb_comments.parse_form_time(v.get("타임스탬프", ""))
+    if since and ts and ts < datetime.fromisoformat(str(since)):
+        return ""
+    col = cfg["sheet"]["columns"].get("email", "이메일 주소")
+    if col not in v:
+        return f"시트에 '{col}' 열이 없어요 → 폼 설정에서 '이메일 주소 수집'을 켜 주세요"
+    email = (v.get(col) or "").strip().lower()
+    if email not in allowed:
+        return f"허용되지 않은 이메일 ({email or '이메일 없음'})"
+    return ""
+
+
 def process_row(cfg, drive, sheet, row) -> None:
     cols = cfg["sheet"]["columns"]
     v = row.values
@@ -106,8 +129,16 @@ def process_row(cfg, drive, sheet, row) -> None:
     platforms = parse_platforms(cfg, v.get(cols["platforms"], ""), account)
     if not account or not platforms or not v.get(cols["video"]):
         return
+    if v.get(STATUS_COL, "").startswith("차단"):
+        return
     todo = pending_platforms(cfg, row, platforms)
     if not todo or is_locked(v.get(STATUS_COL, "")):
+        return
+    blocked = check_sender(cfg, v)
+    if blocked:
+        sheet.write(row, STATUS_COL, f"차단|{blocked}")
+        log.warning("%d행 차단: %s", row.number, blocked)
+        notify.send(cfg, f"🚫 {row.number}행 폼 제출을 업로드하지 않고 건너뛰었어요.\n이유: {blocked}")
         return
 
     sheet.write(row, STATUS_COL, f"처리중|{HOST}|{datetime.now().isoformat(timespec='seconds')}")
