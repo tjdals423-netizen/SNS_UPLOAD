@@ -71,15 +71,18 @@ class Sheet:
         ).execute()
         row.values[header] = value
 
-    def append(self, values: dict) -> None:
+    def append(self, values: dict) -> int:
         """폼 응답처럼 맨 아래에 한 줄 추가 (텔레그램 /upload 용). 같은 이름의 열이 여러 개면 모두 채움."""
-        if not self.headers:
-            self.read()
+        rows = self.read()   # 늘 새로 읽음: 그 사이 폼 응답이 들어왔을 수 있음
         line = [values.get(h, "") for h in self.headers]
-        self.svc.values().append(
+        # values().append 는 폼 응답 시트에서 '표 끝'을 폼 응답 끝으로 봐서, 웹으로 넣은 줄을 다음 웹 줄이
+        # 계속 덮어썼음 (실측 2026-11-07: 82행에 EVA·민아살림·은조네키친·예쁜살림이 차례로 덮임). 그래서
+        # 실제로 채워진 마지막 줄 바로 아래에 직접 씀.
+        last = max((r.number for r in rows if any(str(x).strip() for x in r.values.values())), default=1)
+        self.svc.values().update(
             spreadsheetId=self.sid,
-            range=self._rng("A1"),
+            range=self._rng(f"A{last + 1}"),
             valueInputOption="RAW",
-            insertDataOption="OVERWRITE",
             body={"values": [line]},
         ).execute()
+        return last + 1

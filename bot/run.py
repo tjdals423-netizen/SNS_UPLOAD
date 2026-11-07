@@ -30,7 +30,7 @@ from sns.uploaders import meta, threads, tiktok, youtube
 
 log = logging.getLogger("bot")
 LOCK_TIMEOUT = timedelta(hours=2)
-RETRY_AFTER = timedelta(minutes=10)
+RETRY_AFTER = timedelta(minutes=1)   # 실패하면 1분 뒤 다시 (사용자 지정 2026-11-07, 예전 10분)
 HOST = socket.gethostname()
 PC_LABEL = HOST  # 알림에 보이는 PC 이름. main() 에서 설정(pc_names)으로 바꿈
 
@@ -245,7 +245,7 @@ def process_row(cfg, drive, sheet, row) -> None:
     if not ok:
         for h in dict.fromkeys(h for h in fix_hints if h):
             lines.append("\n" + h)
-        lines.append(f"\n실패한 건 10분 간격으로 최대 {cfg.get('max_retries', 3)}번까지 자동 재시도합니다. 바로 다시 하려면 시트의 해당 결과 칸을 지우세요.")
+        lines.append(f"\n실패한 건 1분 간격으로 최대 {cfg.get('max_retries', 3)}번까지 자동 재시도합니다. 바로 다시 하려면 시트의 해당 결과 칸을 지우세요.")
     notify.send(cfg, "\n".join(lines))
     if results.get("tiktok", "").startswith("완료 초안") and text_for_tiktok:
         notify.send(cfg, f"📋 틱톡 본문 ({account}) — 길게 눌러 복사하세요")
