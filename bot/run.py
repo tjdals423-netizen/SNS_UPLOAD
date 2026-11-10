@@ -51,6 +51,10 @@ def parse_platforms(cfg, raw: str, account: str | None = None) -> list[str]:
     off = set(cfg.get("disabled_platforms") or [])
     # 계정별로 끈 플랫폼 (그 계정에 연결이 없는 플랫폼 등)
     off |= set((cfg.get("account_disabled_platforms") or {}).get(account) or [])
+    # 인스타 스토리: 인스타를 올리는 계정이면 같이 (폼에는 칸이 없음)
+    story = cfg.get("instagram_story") or {}
+    if "instagram" in out and story.get("enabled") and account in (story.get("accounts") or []):
+        out.append("instagram_story")
     return [p for p in PLATFORMS if p in out and p not in off]
 
 
@@ -72,6 +76,10 @@ def pending_platforms(cfg, row, platforms) -> list[str]:
     todo = []
     for p in platforms:
         cell = row.values.get(RESULT_COLS[p], "")
+        # 스토리는 이번에 인스타도 올리는 줄에만 처음 붙음 (스토리 칸이 비었는데 인스타를 안 올리면 건너뜀).
+        # 스토리 기능을 켜기 전에 끝났거나 인스타가 재시도 한도를 넘긴 옛 줄의 영상이 한꺼번에 올라가지 않게 (2026-11-10)
+        if p == "instagram_story" and not cell and "instagram" not in todo:
+            continue
         if not cell or (due and cell.startswith("실패") and fail_count(cell) < cfg.get("max_retries", 3)):
             todo.append(p)
     return todo
@@ -190,6 +198,8 @@ def process_row(cfg, drive, sheet, row) -> None:
                 elif p == "instagram":
                     with public_image(drive, thumb_path) as cover_url:
                         res = meta.upload_instagram(cfg, account, path, text["instagram"], ig_comment, cover_url)
+                elif p == "instagram_story":
+                    res = meta.upload_instagram_story(cfg, account, path, TMP_DIR, drive)
                 elif p == "facebook":
                     res = meta.upload_facebook(cfg, account, path, text["facebook"], comment, thumb_path)
                 elif p == "threads":

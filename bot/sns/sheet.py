@@ -53,6 +53,14 @@ class Sheet:
         if not missing:
             return
         start = len(self.headers)
+        # 폼 응답 탭은 열이 딱 맞게 만들어져 있어서 새 칸을 쓰려면 열부터 늘려야 함
+        # (2026-11-10 결과_인스타스토리 추가 때 'exceeds grid limits' 로 시트 확인이 계속 실패)
+        meta = self.svc.get(spreadsheetId=self.sid, fields="sheets.properties(sheetId,title,gridProperties.columnCount)").execute()
+        prop = next(s["properties"] for s in meta["sheets"] if s["properties"]["title"] == self.ws)
+        need = start + len(missing) - prop["gridProperties"]["columnCount"]
+        if need > 0:
+            self.svc.batchUpdate(spreadsheetId=self.sid, body={"requests": [{"appendDimension": {
+                "sheetId": prop["sheetId"], "dimension": "COLUMNS", "length": need}}]}).execute()
         self.svc.values().update(
             spreadsheetId=self.sid,
             range=self._rng(f"{col_letter(start)}1"),

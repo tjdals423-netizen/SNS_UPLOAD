@@ -81,6 +81,64 @@ def _post_instagram(cfg: dict, account: str, path, caption: str, cover_url: str 
         return pub["id"], pub["id"], token, cover_note
 
 
+# ── 인스타그램 스토리 (사용자 지정 2026-11-10) ──────────────────────
+STORY_MAX_S = 59   # 스토리 영상은 60초까지. 넘으면 앞부분만 잘라 올림 (사용자 지정: 앞 59초)
+
+
+def _duration(ffmpeg: str, path) -> float:
+    import re, subprocess
+    r = subprocess.run([ffmpeg, "-hide_banner", "-i", str(path)], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
+    m = re.search(r"Duration: (\d+):(\d+):([\d.]+)", r.stderr)
+    return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3)) if m else 0.0
+
+
+def _story_file(cfg: dict, path, tmp_dir):
+    """60초를 넘으면 앞 max_seconds 초만 다시 인코딩해 임시 파일로 (돌려준 두 번째 값이 True 면 다 쓰고 지움)."""
+    import subprocess
+    from pathlib import Path
+    import imageio_ffmpeg
+    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    limit = float((cfg.get("instagram_story") or {}).get("max_seconds") or STORY_MAX_S)
+    if _duration(ffmpeg, path) <= limit + 0.5:
+        return Path(path), False
+    out = Path(tmp_dir) / f"story_{os.getpid()}_{int(time.time())}.mp4"
+    subprocess.run([ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-i", str(path), "-t", f"{limit}",
+                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(out)],
+                   check=True, capture_output=True, stdin=subprocess.DEVNULL, timeout=1200)
+    return out, True
+
+
+def upload_instagram_story(cfg: dict, account: str, path, tmp_dir, drive) -> str:
+    """같은 영상을 스토리로 (릴스와 같은 페이지 토큰, media_type=STORIES). 링크 대신 스토리 id.
+    스토리는 릴스처럼 파일을 바로 올리면(resumable) 'ProcessingFailedError' 로 거절돼서 (실측 2026-11-10)
+    쓰레드처럼 드라이브에 잠깐 올려 공개 주소(video_url)로 넘기고 끝나면 지움."""
+    from pathlib import Path
+    from ..google_client import PublicLink, temp_drive_file
+    info = _account("instagram", account)
+    g, token, ig = _graph(cfg), info["token"], info["ig_id"]
+    src, temp = _story_file(cfg, path, tmp_dir)
+    try:
+        with temp_drive_file(drive, Path(src)) as fid, PublicLink(drive, fid) as video_url:
+            container = check(requests.post(f"{g}/{ig}/media", data={"media_type": "STORIES", "video_url": video_url,
+                                                                      "access_token": token}, timeout=60))
+
+            def status():
+                d = check(requests.get(f"{g}/{container['id']}", params={"fields": "status_code,status", "access_token": token}, timeout=30))
+                return d.get("status_code"), d.get("status")
+
+            wait_until(status, done={"FINISHED"}, failed={"ERROR", "EXPIRED"}, timeout=900)
+            pub = check(requests.post(f"{g}/{ig}/media_publish", data={"creation_id": container["id"], "access_token": token}, timeout=60))
+            return f"스토리 {pub['id']}" + (" (앞 59초)" if temp else "")
+    finally:
+        if temp:
+            try:
+                os.remove(src)
+            except OSError:
+                pass
+
+
 # ── 페이스북 페이지 릴스 (실패하면 일반 동영상으로) ────────────────
 def upload_facebook(cfg: dict, account: str, path, caption: str, comment: str = "", thumb_path=None) -> str:
     link, post_id, token = _post_facebook(cfg, account, path, caption)

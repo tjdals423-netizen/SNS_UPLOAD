@@ -32,7 +32,7 @@ def _token_hint(p: str, account: str) -> str:
             f"4) '✅ 쓰레드 {account} = {who} 연결 완료' 확인 (계정이 다르면 크롬 계정 바꾸고 다시)\n"
             f"5) 시트 결과_쓰레드 칸 지우기 → 다시 올라감 (봇 재시작 필요 없음)"
         )
-    if p in ("instagram", "facebook"):
+    if p in ("instagram", "instagram_story", "facebook"):
         return (
             f"🔑 페북·인스타 {account} 연결이 끊겼어요 (약 90일마다 만료). 이렇게 하세요:\n"
             "1) developers.facebook.com/tools/explorer 에서 사용자 토큰 새로 받기 (권한 8개, README 참고)\n"

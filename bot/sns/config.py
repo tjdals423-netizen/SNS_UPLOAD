@@ -15,10 +15,12 @@ GOOGLE_CLIENT_PATH = SECRETS_DIR / "google_client.json"
 TMP_DIR = BOT_DIR / "tmp"
 LOG_DIR = BOT_DIR / "logs"
 
-PLATFORMS = ["youtube", "instagram", "facebook", "threads", "tiktok"]
+# instagram_story: 폼 체크박스가 아니라 인스타 릴스를 새로 올릴 때 같이 (사용자 지정 2026-11-10, config instagram_story)
+PLATFORMS = ["youtube", "instagram", "instagram_story", "facebook", "threads", "tiktok"]
 PLATFORM_KO = {
     "youtube": "유튜브",
     "instagram": "인스타",
+    "instagram_story": "인스타스토리",
     "facebook": "페북",
     "threads": "쓰레드",
     "tiktok": "틱톡",
