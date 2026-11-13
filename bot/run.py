@@ -197,7 +197,7 @@ def process_row(cfg, drive, sheet, row) -> None:
                         res += f" (댓글: {cfg.get('youtube', {}).get('comment_wait_minutes', 20)}분 안에 공개하면 자동)"
                 elif p == "instagram":
                     with public_image(drive, thumb_path) as cover_url:
-                        res = meta.upload_instagram(cfg, account, path, text["instagram"], ig_comment, cover_url)
+                        res = meta.upload_instagram(cfg, account, path, text["instagram"], ig_comment, cover_url, drive)
                 elif p == "instagram_story":
                     res = meta.upload_instagram_story(cfg, account, path, TMP_DIR, drive)
                 elif p == "facebook":

@@ -36,8 +36,9 @@ def _account(section: str, account: str) -> dict:
 
 
 # ── 인스타그램 릴스 ─────────────────────────────────────────────
-def upload_instagram(cfg: dict, account: str, path, caption: str, comment: str = "", cover_url: str | None = None) -> str:
-    link, media_id, token, cover_note = _post_instagram(cfg, account, path, caption, cover_url)
+def upload_instagram(cfg: dict, account: str, path, caption: str, comment: str = "", cover_url: str | None = None,
+                     drive=None) -> str:
+    link, media_id, token, cover_note = _post_instagram(cfg, account, path, caption, cover_url, drive)
     if cover_note:
         link += " " + cover_note
     if comment:
@@ -45,29 +46,50 @@ def upload_instagram(cfg: dict, account: str, path, caption: str, comment: str =
     return link
 
 
-def _post_instagram(cfg: dict, account: str, path, caption: str, cover_url: str | None = None):
+def _post_instagram(cfg: dict, account: str, path, caption: str, cover_url: str | None = None, drive=None):
+    """릴스 올리기. 먼저 파일을 바로 올리고(resumable), 인스타가 'ProcessingFailedError' 로 거절하면
+    드라이브에 잠깐 올려 공개 주소(video_url)로 다시 (스토리와 같은 방식).
+    (2026-11-12 예쁜살림부터 11-13 민아살림·은조네키친까지 바로 올리기가 계속 거절됨. retriable False 라 기다려도 안 풀림)"""
+    from pathlib import Path
     info = _account("instagram", account)
     g, token, ig = _graph(cfg), info["token"], info["ig_id"]
-    data = {
+    base = {
         "media_type": "REELS",
-        "upload_type": "resumable",
         "caption": caption,
         "share_to_feed": "true",
         "access_token": token,
     }
-    cover_note = ""
-    if cover_url:
-        try:
-            container = check(requests.post(f"{g}/{ig}/media", data={**data, "cover_url": cover_url}, timeout=60))
-            cover_note = "(썸네일✅)"
-        except UploadError as e:
-            # 커버 때문에 막히면 커버 없이라도 올림
-            container = check(requests.post(f"{g}/{ig}/media", data=data, timeout=60))
-            cover_note = f"(썸네일❌ {str(e)[:100]})"
-    else:
-        container = check(requests.post(f"{g}/{ig}/media", data=data, timeout=60))
-    _rupload(container["uri"], token, path)
 
+    def make(extra: dict):
+        nonlocal cover_note
+        data = {**base, **extra}
+        if cover_url:
+            try:
+                c = check(requests.post(f"{g}/{ig}/media", data={**data, "cover_url": cover_url}, timeout=60))
+                cover_note = "(썸네일✅)"
+                return c
+            except UploadError as e:
+                # 커버 때문에 막히면 커버 없이라도 올림
+                cover_note = f"(썸네일❌ {str(e)[:100]})"
+        return check(requests.post(f"{g}/{ig}/media", data=data, timeout=60))
+
+    cover_note = ""
+    try:
+        container = make({"upload_type": "resumable"})
+        _rupload(container["uri"], token, path)
+        return _finish_instagram(g, ig, token, container, cover_note)
+    except UploadError as e:
+        if drive is None or "ProcessingFailed" not in str(e):
+            raise
+    from ..google_client import PublicLink, temp_drive_file
+    with temp_drive_file(drive, Path(path)) as fid, PublicLink(drive, fid) as video_url:
+        container = make({"video_url": video_url})
+        link, media_id, token, note = _finish_instagram(g, ig, token, container, cover_note)
+        return link, media_id, token, (note + " (드라이브 주소로)").strip()
+
+
+def _finish_instagram(g: str, ig: str, token: str, container: dict, cover_note: str):
+    """컨테이너 처리가 끝나길 기다렸다가 게시. (링크, 게시물 id, 토큰, 썸네일 메모)."""
     def status():
         d = check(requests.get(f"{g}/{container['id']}", params={"fields": "status_code,status", "access_token": token}, timeout=30))
         return d.get("status_code"), d.get("status")
