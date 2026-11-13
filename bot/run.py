@@ -258,9 +258,28 @@ def process_row(cfg, drive, sheet, row) -> None:
             lines.append("\n" + h)
         lines.append(f"\n실패한 건 1분 간격으로 최대 {cfg.get('max_retries', 3)}번까지 자동 재시도합니다. 바로 다시 하려면 시트의 해당 결과 칸을 지우세요.")
     notify.send(cfg, "\n".join(lines))
+    story_share_reminder(cfg, account, results.get("instagram", ""))
     if results.get("tiktok", "").startswith("완료 초안") and text_for_tiktok:
         notify.send(cfg, f"📋 틱톡 본문 ({account}) — 길게 눌러 복사하세요")
         notify.send(cfg, text_for_tiktok)
+
+
+def story_share_reminder(cfg, account: str, ig_result: str) -> None:
+    """릴스가 방금 올라갔으면 릴스 열기 버튼 + 스토리 공유 방법을 텔레그램으로 (사용자 지정 2026-11-13).
+    앱에서 공유 → 스토리에 추가로 올려야 스토리에 '게시물 보기'가 떠서 (API는 릴스를 스토리로 공유하지 못함)."""
+    conf = cfg.get("instagram_story_share") or {}
+    if not conf.get("enabled") or account not in (conf.get("accounts") or []) or not ig_result.startswith("완료"):
+        return
+    m = re.search(r"https://www\.instagram\.com/\S+", ig_result)
+    if not m:
+        return
+    notify.send(cfg, f"📲 {account} 릴스를 스토리로 공유해 주세요\n"
+                     "1. 아래 [릴스 열기] 누르기 (인스타 앱에서 열려요. 그 계정으로 바꿔 둔 상태여야 해요)\n"
+                     "2. 릴스 오른쪽 종이비행기(공유) 누르기\n"
+                     "3. '스토리에 추가' 누르기\n"
+                     "4. 오른쪽 아래 '내 스토리' 누르기\n"
+                     "→ 스토리에 '게시물 보기'가 떠서 누르면 이 릴스로 넘어가요",
+                buttons=[("릴스 열기", m.group(0))])
 
 
 def needs_work(cfg, row) -> bool:
