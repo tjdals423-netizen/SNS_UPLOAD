@@ -1,4 +1,5 @@
 import json
+import threading
 import logging
 import time
 
@@ -51,10 +52,14 @@ def _save(items: list) -> None:
         json.dump(items, f, ensure_ascii=False, indent=2)
 
 
+_PENDING_LOCK = threading.Lock()  # 여러 행을 동시에 올릴 때 서로 덮어쓰지 않게
+
+
 def add_pending(account: str, video_url: str, comment: str) -> None:
-    items = _load()
-    items.append({"account": account, "video_id": video_url.rsplit("/", 1)[-1], "comment": comment, "added": time.time(), "checked": 0})
-    _save(items)
+    with _PENDING_LOCK:
+        items = _load()
+        items.append({"account": account, "video_id": video_url.rsplit("/", 1)[-1], "comment": comment, "added": time.time(), "checked": 0})
+        _save(items)
 
 
 def flush_pending(cfg: dict) -> list[str]:

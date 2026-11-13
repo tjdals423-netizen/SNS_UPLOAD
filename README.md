@@ -182,6 +182,7 @@ Claude 에게 물어볼 때: *"`C:\SNS_UPLOAD` 에 있는 SNS 업로드 봇이�
 | `drive_cleanup` | `delete` 성공 시 원본 영구 삭제 / `trash` 휴지통 / `off` 그대로 |
 | `tiktok.mode` | `inbox` 틱톡 초안으로 보내기 (기본, 바꾸지 마세요) |
 | `poll_seconds` | 시트 확인 주기(초), 기본 60 |
+| `parallel_uploads` | 계정이 다른 줄을 동시에 올리는 수, 기본 3 (같은 계정 줄은 차례대로) |
 | `ai.anthropic_api_key` | 넣으면 빈 글 칸을 AI 가 작성 (선택) |
 
 ---

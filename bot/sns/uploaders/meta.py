@@ -1,5 +1,6 @@
 """페이스북 페이지(릴스) + 인스타그램(릴스) 업로드. 둘 다 페이지 토큰 사용."""
 import os
+import threading
 import time
 
 import requests
@@ -124,7 +125,7 @@ def _story_file(cfg: dict, path, tmp_dir):
     limit = float((cfg.get("instagram_story") or {}).get("max_seconds") or STORY_MAX_S)
     if _duration(ffmpeg, path) <= limit + 0.5:
         return Path(path), False
-    out = Path(tmp_dir) / f"story_{os.getpid()}_{int(time.time())}.mp4"
+    out = Path(tmp_dir) / f"story_{os.getpid()}_{threading.get_ident()}_{int(time.time())}.mp4"
     subprocess.run([ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-i", str(path), "-t", f"{limit}",
                     "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
                     "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(out)],

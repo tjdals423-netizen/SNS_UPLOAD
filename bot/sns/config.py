@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+import threading
 from pathlib import Path
 
 import yaml
@@ -51,10 +52,14 @@ def save_tokens(tokens: dict) -> None:
     os.replace(tmp, TOKENS_PATH)
 
 
+_TOKEN_LOCK = threading.Lock()  # 여러 행을 동시에 올릴 때 토큰 파일을 서로 덮어쓰지 않게
+
+
 def update_token(section: str, key: str, value) -> None:
-    tokens = load_tokens()
-    tokens.setdefault(section, {})[key] = value
-    save_tokens(tokens)
+    with _TOKEN_LOCK:
+        tokens = load_tokens()
+        tokens.setdefault(section, {})[key] = value
+        save_tokens(tokens)
 
 
 SECRET_PATTERNS = [

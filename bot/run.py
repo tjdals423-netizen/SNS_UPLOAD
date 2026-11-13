@@ -10,6 +10,7 @@ import socket
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -262,10 +263,22 @@ def process_row(cfg, drive, sheet, row) -> None:
         notify.send(cfg, text_for_tiktok)
 
 
-def run_once(cfg) -> None:
+def needs_work(cfg, row) -> bool:
+    """process_row 가 실제로 무언가 할 줄인지 (빈 줄·끝난 줄은 일꾼을 만들지 않음)."""
+    cols = cfg["sheet"]["columns"]
+    v = row.values
+    account = cfg.get("account_labels", {}).get(v.get(cols["account"], "").strip())
+    platforms = parse_platforms(cfg, v.get(cols["platforms"], ""), account)
+    if not account or not platforms or not v.get(cols["video"]) or v.get(STATUS_COL, "").startswith("차단"):
+        return False
+    return bool(pending_platforms(cfg, row, platforms)) and not is_locked(v.get(STATUS_COL, ""))
+
+
+def _run_group(cfg, headers, rows) -> None:
+    """한 계정의 줄들을 차례로 처리. 구글 연결은 스레드끼리 같이 쓰면 안 돼서 일꾼마다 새로 만듦."""
     drive, sheets = owner_services()
     sheet = Sheet(sheets, cfg)
-    rows = sheet.read()
+    sheet.headers = list(headers)
     for row in rows:
         if STOP.is_set():
             return  # /shutdown: 하던 행까지만 끝내고 종료
@@ -274,6 +287,22 @@ def run_once(cfg) -> None:
             process_row(cfg, drive, sheet, row)
         except Exception:
             log.exception("%d행 처리 중 오류", row.number)
+
+
+def run_once(cfg) -> None:
+    drive, sheets = owner_services()
+    sheet = Sheet(sheets, cfg)
+    rows = sheet.read()
+    # 계정이 다른 줄은 동시에 올림. 같은 계정 줄은 차례대로 (같은 계정에 한꺼번에 올리면 막히기 쉬움)
+    groups: dict[str, list] = {}
+    for row in rows:
+        if needs_work(cfg, row):
+            groups.setdefault(row.values.get(cfg["sheet"]["columns"]["account"], "").strip(), []).append(row)
+    if groups:
+        workers = max(1, int(cfg.get("parallel_uploads", 3)))
+        with ThreadPoolExecutor(max_workers=min(workers, len(groups))) as pool:
+            for f in [pool.submit(_run_group, cfg, sheet.headers, g) for g in groups.values()]:
+                f.result()
     for msg in youtube.flush_pending(cfg):
         notify.send(cfg, msg)
     try:
