@@ -308,7 +308,25 @@ def _run_group(cfg, headers, rows) -> None:
             log.exception("%d행 처리 중 오류", row.number)
 
 
+POOL: ThreadPoolExecutor | None = None
+ACTIVE: dict[str, object] = {}   # 계정 → 지금 올리고 있는 일꾼 (Future)
+
+
+def busy() -> bool:
+    return any(not f.done() for f in ACTIVE.values())
+
+
+def wait_uploads() -> None:
+    """올리고 있는 줄이 다 끝날 때까지 (/shutdown·--once 때)."""
+    for f in list(ACTIVE.values()):
+        f.result()
+
+
 def run_once(cfg) -> None:
+    """시트를 보고, 지금 안 올리고 있는 계정의 줄만 일꾼에게 맡긴다 (끝날 때까지 기다리지 않음).
+    예전엔 한 번 맡긴 줄들이 다 끝나야 시트를 다시 봐서, 몇 분 간격으로 넣은 다른 계정 줄이
+    앞 계정이 끝날 때까지 기다렸음 (2026-11-15: 4계정을 4분 간격으로 넣었더니 하나씩 올라감)."""
+    global POOL
     drive, sheets = owner_services()
     sheet = Sheet(sheets, cfg)
     rows = sheet.read()
@@ -317,11 +335,15 @@ def run_once(cfg) -> None:
     for row in rows:
         if needs_work(cfg, row):
             groups.setdefault(row.values.get(cfg["sheet"]["columns"]["account"], "").strip(), []).append(row)
-    if groups:
-        workers = max(1, int(cfg.get("parallel_uploads", 3)))
-        with ThreadPoolExecutor(max_workers=min(workers, len(groups))) as pool:
-            for f in [pool.submit(_run_group, cfg, sheet.headers, g) for g in groups.values()]:
-                f.result()
+    if POOL is None:
+        POOL = ThreadPoolExecutor(max_workers=max(1, int(cfg.get("parallel_uploads", 4))))
+    for account, g in groups.items():
+        f = ACTIVE.get(account)
+        if f is not None and not f.done():
+            continue   # 이 계정은 올리는 중 — 남은 줄은 끝난 뒤 다음 확인 때
+        ACTIVE[account] = POOL.submit(_run_group, cfg, sheet.headers, g)
+    if busy():
+        return   # 아래 정리 작업은 올리는 게 다 끝난 뒤에 (같은 시트·토큰을 동시에 건드리지 않게)
     for msg in youtube.flush_pending(cfg):
         notify.send(cfg, msg)
     try:
@@ -453,6 +475,8 @@ def main() -> None:
             daily_token_check(cfg)
         try:
             run_once(cfg)
+            if once:
+                wait_uploads()
             STATE["last_check"] = datetime.now()
             STATE["last_error"] = None
         except Exception as e:
@@ -463,6 +487,7 @@ def main() -> None:
             break
         STOP.wait(cfg.get("poll_seconds", 60))
         if STOP.is_set():
+            wait_uploads()   # 올리던 줄은 끝까지 (일꾼은 새 줄을 안 잡음)
             log.info("텔레그램 /shutdown 으로 종료합니다")
             notify.send(cfg, f"⏹ 업로드 봇을 껐어요 ({PC_LABEL}). 다시 켜려면 그 PC 에서 start_bot.bat 을 실행하세요.")
             logging.shutdown()
