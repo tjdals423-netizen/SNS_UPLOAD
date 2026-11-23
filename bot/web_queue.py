@@ -4,7 +4,8 @@
 봇 본체가 평소처럼 처리한다 (재시도, /status, 결과 알림, 페북 자동 댓글 모두 그대로).
 
   python web_queue.py info    계정·다음 댓글 번호·봇 상태·PC 경로로 넣은 줄들의 진행 상황
-  python web_queue.py add     (stdin JSON: account, video, title, body, comment) 시트에 한 줄 추가
+  python web_queue.py add     (stdin JSON: account, video, title, body, comment, youtube) 시트에 한 줄 추가
+                              youtube=false 면 플랫폼에서 유튜브를 빼고 넣음 (제목 없어도 됨, 2026-11-23)
   python web_queue.py retry   (stdin JSON: timestamp, video) 실패 칸을 지워 다시 올리게 함
 
 결과는 stdout 에 JSON 한 줄. 실패하면 {"error": "..."} + 종료 코드 1.
@@ -25,6 +26,7 @@ from sns.tg_upload import form_timestamp
 # 폼의 플랫폼 체크박스 문구와 같아야 함. 페북은 disabled_platforms 라서 봇이 올리지 않고,
 # 직접 올리면 fb_comments 가 이 줄의 댓글 번호로 댓글만 단다 (폼으로 낼 때와 같음)
 PLATFORM_TEXT = "인스타, 쓰레드, 유튜브, 페이스북"
+PLATFORM_TEXT_NO_YT = "인스타, 쓰레드, 페이스북"   # 유튜브는 안 올릴 때 (생활템은 하루에 여러 개라 유튜브는 골라서)
 
 
 def _sheet(cfg: dict) -> Sheet:
@@ -105,8 +107,9 @@ def add(cfg: dict, req: dict) -> dict:
         raise ValueError(f"알 수 없는 계정이에요: {account}")
     if not is_local_path(video) or not Path(video).is_file():
         raise ValueError(f"영상 파일을 찾을 수 없어요: {video}")
-    if not title or not body:
-        raise ValueError("유튜브 제목과 본문이 필요해요")
+    youtube = req.get("youtube", True) is not False
+    if not body or (youtube and not title):
+        raise ValueError("유튜브 제목과 본문이 필요해요" if youtube else "본문이 필요해요")
     cols = cfg["sheet"]["columns"]
     stamp = form_timestamp(datetime.now())
     _sheet(cfg).append({
@@ -116,7 +119,7 @@ def add(cfg: dict, req: dict) -> dict:
         cols["yt_title"]: title,
         cols["body"]: body,
         cols["tiktok_body"]: "",
-        cols["platforms"]: PLATFORM_TEXT,
+        cols["platforms"]: PLATFORM_TEXT if youtube else PLATFORM_TEXT_NO_YT,
         cols.get("comment", "댓글"): (req.get("comment") or "").strip(),
     })
     return {"timestamp": stamp, "video": video}
