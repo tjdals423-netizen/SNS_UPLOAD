@@ -93,7 +93,7 @@ def info(cfg: dict, _req: dict) -> dict:
         "comment_template": cfg.get("comment_template") or "",
         "instagram_comment": cfg.get("instagram_comment") or "",
         "youtube_privacy": yt.get("privacy", "private"),
-        "youtube_comment_wait": yt.get("comment_wait_minutes", 20),
+        "youtube_comment_wait": yt.get("comment_wait_minutes", 90),
         "rows": local,
     }
 
