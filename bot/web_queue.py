@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 from run import fail_count
+from sns import fb_comments
 from sns.config import PLATFORM_KO, load_config, redact
 from sns.google_client import is_local_path, owner_services
 from sns.sheet import RESULT_COLS, STATUS_COL, Sheet
@@ -122,6 +123,8 @@ def add(cfg: dict, req: dict) -> dict:
         cols["platforms"]: PLATFORM_TEXT if youtube else PLATFORM_TEXT_NO_YT,
         cols.get("comment", "댓글"): (req.get("comment") or "").strip(),
     })
+    if fb := (req.get("fb_comment") or "").strip():   # 페북에만 다른 댓글 (생활템 쿠팡 고지 + 링크, 2026-11-26)
+        fb_comments.set_override(stamp, fb)
     return {"timestamp": stamp, "video": video}
 
 

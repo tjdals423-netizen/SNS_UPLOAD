@@ -36,6 +36,25 @@ def _save(state: dict) -> None:
         json.dump(state, f, ensure_ascii=False, indent=2)
 
 
+OVERRIDE_PATH = SECRETS_DIR / "fb_comment_override.json"   # {폼 타임스탬프: 페북에만 달 댓글}
+
+
+def set_override(stamp: str, text: str) -> None:
+    """웹 화면이 넣은 줄: 페북에는 '댓글' 칸 대신 이 글을 단다 (생활템 쿠팡 고지 + 제품 링크, 2026-11-26)."""
+    data = _overrides()
+    data[stamp] = text
+    SECRETS_DIR.mkdir(parents=True, exist_ok=True)
+    keep = dict(list(data.items())[-200:])
+    OVERRIDE_PATH.write_text(json.dumps(keep, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def _overrides() -> dict:
+    try:
+        return json.loads(OVERRIDE_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
 def parse_form_time(s: str):
     """구글 폼 타임스탬프 '2026. 10. 12 오후 3:54:26' → datetime (PC 현지 시간)."""
     m = re.match(r"\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?\s*(오전|오후)\s*(\d{1,2}):(\d{2}):(\d{2})", s or "")
@@ -82,9 +101,11 @@ def run(cfg: dict, rows: list, build_comment) -> list[str]:
     labels = cfg.get("account_labels", {})
     # 댓글이 있는 폼 응답만 후보
     cands = []
+    over = _overrides()
     for r in rows:
         acct = labels.get(r.values.get(cols["account"], "").strip())
-        comment = build_comment(cfg, r.values.get(cols.get("comment", "댓글"), ""))
+        comment = (over.get(r.values.get("타임스탬프", "").strip())
+                   or build_comment(cfg, r.values.get(cols.get("comment", "댓글"), "")))
         ts = parse_form_time(r.values.get("타임스탬프", ""))
         if acct and comment and ts and r.number not in used and now - ts < GIVE_UP_AFTER + MATCH_WINDOW:
             cands.append({"row": r.number, "acct": acct, "comment": comment, "ts": ts, "body": _norm(r.values.get(cols["body"], ""))})
