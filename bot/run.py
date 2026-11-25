@@ -195,7 +195,7 @@ def process_row(cfg, drive, sheet, row) -> None:
                     res = youtube.upload(cfg, account, path, text["youtube"])
                     if comment:
                         youtube.add_pending(account, res, comment)
-                        res += f" (댓글: {cfg.get('youtube', {}).get('comment_wait_minutes', 90)}분 안에 공개하면 자동)"
+                        res += f" (댓글: {cfg.get('youtube', {}).get('comment_wait_minutes', 180)}분 안에 공개하면 자동)"
                 elif p == "instagram":
                     with public_image(drive, thumb_path) as cover_url:
                         res = meta.upload_instagram(cfg, account, path, text["instagram"], ig_comment, cover_url, drive)

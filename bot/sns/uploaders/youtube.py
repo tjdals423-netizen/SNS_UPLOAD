@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 # 비공개 영상엔 댓글을 못 달아서, 공개로 바뀌면 그때 다는 대기열
 PENDING_PATH = SECRETS_DIR / "youtube_comments.json"
 CHECK_EVERY = 60           # 공개 여부 확인 주기(초)
-DEFAULT_WAIT_MIN = 90      # 업로드 후 이 시간(분) 안에 공개되면 댓글, 지나면 건너뜀 (2026-11-24: 20 → 90분)
+DEFAULT_WAIT_MIN = 180     # 업로드 후 이 시간(분) 안에 공개되면 댓글, 지나면 건너뜀 (20 → 90분 → 2026-11-26: 180분)
 SLOW_AFTER = 20 * 60       # 20분이 지나면 확인을 SLOW_EVERY 초마다로 줄여 API 할당량을 아낌
 SLOW_EVERY = 180
 
