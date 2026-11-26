@@ -79,6 +79,18 @@ class Sheet:
         ).execute()
         row.values[header] = value
 
+    def _ensure_rows(self, row_no: int) -> None:
+        """그 행까지 칸이 있게 행을 늘림. 폼 응답 탭은 행도 딱 맞게 만들어져 있어서, 웹·텔레그램으로 넣은 줄이
+        시트 끝을 넘으면 'exceeds grid limits' 로 업로드가 아예 안 됐음 (2026-11-26: 181행 시트에 182행 쓰기 실패).
+        한 번에 100행씩 늘림."""
+        meta = self.svc.get(spreadsheetId=self.sid,
+                            fields="sheets.properties(sheetId,title,gridProperties.rowCount)").execute()
+        prop = next(s["properties"] for s in meta["sheets"] if s["properties"]["title"] == self.ws)
+        have = prop["gridProperties"]["rowCount"]
+        if row_no > have:
+            self.svc.batchUpdate(spreadsheetId=self.sid, body={"requests": [{"appendDimension": {
+                "sheetId": prop["sheetId"], "dimension": "ROWS", "length": row_no - have + 100}}]}).execute()
+
     def append(self, values: dict) -> int:
         """폼 응답처럼 맨 아래에 한 줄 추가 (텔레그램 /upload 용). 같은 이름의 열이 여러 개면 모두 채움."""
         rows = self.read()   # 늘 새로 읽음: 그 사이 폼 응답이 들어왔을 수 있음
@@ -87,6 +99,7 @@ class Sheet:
         # 계속 덮어썼음 (실측 2026-11-07: 82행에 EVA·민아살림·은조네키친·예쁜살림이 차례로 덮임). 그래서
         # 실제로 채워진 마지막 줄 바로 아래에 직접 씀.
         last = max((r.number for r in rows if any(str(x).strip() for x in r.values.values())), default=1)
+        self._ensure_rows(last + 1)
         self.svc.values().update(
             spreadsheetId=self.sid,
             range=self._rng(f"A{last + 1}"),
