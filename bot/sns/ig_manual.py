@@ -20,7 +20,8 @@ from .uploaders.meta import _comment, _graph
 
 log = logging.getLogger(__name__)
 
-DEFAULT_ACCOUNTS = ["민아살림", "은조네키친", "예쁜살림"]   # config.yaml 에 instagram_manual_accounts 가 없을 때 (예쁜살림 2026-11-27 추가)
+DEFAULT_ACCOUNTS: list[str] = []   # config.yaml 에 instagram_manual_accounts 가 없을 때. 2026-11-27 민아·은조·예쁜살림으로 해 봤다가
+# 인사이트 비교 결과 봇 업로드 탓이 아니라서 같은 날 다시 자동으로 (기능은 남겨 둠: config 에 계정을 넣으면 직접 올리기)
 PENDING_PATH = SECRETS_DIR / "ig_manual_pending.json"
 SLACK_S = 600            # 대기 등록 10분 전에 올라온 릴스까지 인정 (텔레그램 받자마자 올린 경우)
 FAST_EVERY, SLOW_EVERY, SLOW_AFTER = 120, 600, 1800
