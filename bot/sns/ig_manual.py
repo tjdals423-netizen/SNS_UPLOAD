@@ -1,4 +1,4 @@
-"""인스타를 직접 올리는 계정 (사용자 지정 2026-11-27: 레시피 계정 민아살림·은조네키친).
+"""인스타를 직접 올리는 계정 (사용자 지정 2026-11-27: 민아살림·은조네키친·예쁜살림).
 
 봇은 인스타 릴스를 올리지 않고, 텔레그램으로 영상·본문을 보내 준 뒤 사람이 앱에서 올린 릴스를 찾아
 고정 댓글(instagram_comment)만 단다. API로 올린 릴스는 앱 음악·기능을 못 써서 직접 올려 보기로 함.
@@ -20,7 +20,7 @@ from .uploaders.meta import _comment, _graph
 
 log = logging.getLogger(__name__)
 
-DEFAULT_ACCOUNTS = ["민아살림", "은조네키친"]   # config.yaml 에 instagram_manual_accounts 가 없을 때
+DEFAULT_ACCOUNTS = ["민아살림", "은조네키친", "예쁜살림"]   # config.yaml 에 instagram_manual_accounts 가 없을 때 (예쁜살림 2026-11-27 추가)
 PENDING_PATH = SECRETS_DIR / "ig_manual_pending.json"
 SLACK_S = 600            # 대기 등록 10분 전에 올라온 릴스까지 인정 (텔레그램 받자마자 올린 경우)
 FAST_EVERY, SLOW_EVERY, SLOW_AFTER = 120, 600, 1800
