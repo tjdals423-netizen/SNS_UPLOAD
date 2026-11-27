@@ -27,6 +27,7 @@ from sns.google_client import (
     temp_drive_file,
 )
 from sns.sheet import RESULT_COLS, STATUS_COL, Sheet
+from sns import ig_manual
 from sns.uploaders import meta, threads, tiktok, youtube
 
 log = logging.getLogger("bot")
@@ -54,7 +55,9 @@ def parse_platforms(cfg, raw: str, account: str | None = None) -> list[str]:
     off |= set((cfg.get("account_disabled_platforms") or {}).get(account) or [])
     # 인스타 스토리: 인스타를 올리는 계정이면 같이 (폼에는 칸이 없음)
     story = cfg.get("instagram_story") or {}
-    if "instagram" in out and story.get("enabled") and account in (story.get("accounts") or []):
+    # 인스타를 직접 올리는 계정(ig_manual)은 스토리도 사람이 앱에서 공유
+    if ("instagram" in out and story.get("enabled") and account in (story.get("accounts") or [])
+            and not ig_manual.is_manual(cfg, account)):
         out.append("instagram_story")
     return [p for p in PLATFORMS if p in out and p not in off]
 
@@ -196,6 +199,8 @@ def process_row(cfg, drive, sheet, row) -> None:
                     if comment:
                         youtube.add_pending(account, res, comment)
                         res += f" (댓글: {cfg.get('youtube', {}).get('comment_wait_minutes', 180)}분 안에 공개하면 자동)"
+                elif p == "instagram" and ig_manual.is_manual(cfg, account):
+                    res = manual_instagram(cfg, account, path, text["instagram"], ig_comment, row.number)
                 elif p == "instagram":
                     with public_image(drive, thumb_path) as cover_url:
                         res = meta.upload_instagram(cfg, account, path, text["instagram"], ig_comment, cover_url, drive)
@@ -262,6 +267,22 @@ def process_row(cfg, drive, sheet, row) -> None:
     if results.get("tiktok", "").startswith("완료 초안") and text_for_tiktok:
         notify.send(cfg, f"📋 틱톡 본문 ({account}) — 길게 눌러 복사하세요")
         notify.send(cfg, text_for_tiktok)
+
+
+def manual_instagram(cfg, account: str, path, caption: str, comment: str, row_no: int) -> str:
+    """인스타를 직접 올리는 계정 (사용자 지정 2026-11-27, 레시피 계정): 봇은 안 올리고 영상·본문을 텔레그램으로
+    보낸 뒤, 앱에서 올린 릴스를 찾아 댓글만 담 (sns/ig_manual.py)."""
+    hours = ig_manual.wait_hours(cfg)
+    notify.send(cfg, f"📲 {account} 인스타는 직접 올려 주세요 ({row_no}행)\n"
+                     "아래 영상을 저장해서 인스타 앱으로 올리고, 다음 메시지의 본문을 복사해 붙여 넣으면 돼요.\n"
+                     f"올리면 {hours:.0f}시간 안에 봇이 찾아서 댓글을 달아요"
+                     + (f": {comment}" if comment else " (댓글 문구가 없어서 댓글은 안 달아요)"))
+    note = notify.send_video(cfg, path, f"{account} {row_no}행 영상")
+    if note:
+        notify.send(cfg, f"⚠️ {note}. 드라이브나 PC에서 영상을 옮겨 주세요.")
+    notify.send(cfg, caption)
+    ig_manual.add(account, comment, row_no)
+    return f"직접 올리기 (영상·본문 텔레그램으로 보냄, 올리면 {hours:.0f}시간 안에 댓글 자동)"
 
 
 def story_share_reminder(cfg, account: str, ig_result: str) -> None:
@@ -347,6 +368,11 @@ def run_once(cfg) -> None:
     for msg in youtube.flush_pending(cfg):
         notify.send(cfg, msg)
     try:
+        for msg in ig_manual.flush(cfg):
+            notify.send(cfg, msg)
+    except Exception:
+        log.exception("인스타 직접 올리기 댓글 처리 중 오류")
+    try:
         for msg in fb_comments.run(cfg, rows, build_comment):
             notify.send(cfg, msg)
     except Exception:
@@ -392,6 +418,9 @@ def status_text(cfg) -> str:
     pending_yt = len(youtube._load())
     if pending_yt:
         lines.append(f"• 유튜브 댓글 대기: {pending_yt}건 (공개로 바꾸면 자동)")
+    pending_ig = ig_manual.count()
+    if pending_ig:
+        lines.append(f"• 인스타 직접 올리기 대기: {pending_ig}건 (올리면 댓글 자동)")
 
     _, sheets = owner_services()
     rows = Sheet(sheets, cfg).read()

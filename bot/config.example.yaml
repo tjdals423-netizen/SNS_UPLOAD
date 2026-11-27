@@ -36,6 +36,10 @@ instagram_story_share:
   accounts: [민아살림, 은조네키친, 예쁜살림, EVA]
 
 instagram_comment: '댓글에 "나도" 남겨주시면 알려드릴게요💌'
+# 인스타를 봇이 안 올리고 직접 올리는 계정. 영상·본문을 텔레그램으로 보내 주고, 앱에서 올린 릴스를 찾아 위 댓글만 담.
+# 비워 두면 [] (모든 계정 봇이 올림), 없으면 기본 민아살림·은조네키친
+instagram_manual_accounts: [민아살림, 은조네키친]
+instagram_manual_wait_hours: 24   # 이 시간 안에 안 올리면 댓글은 건너뜀
 
 # 업로드가 모두 성공하면 드라이브 원본 영상 정리
 #   delete = 영구 삭제 (용량 바로 확보) / trash = 휴지통 / off = 그대로 둠
